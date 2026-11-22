@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mini Booking Demo</title>
+  <style>
+    body{font-family:sans-serif;max-width:420px;margin:20px auto;padding:0 10px}
+    #chat{border:1px solid #ccc;border-radius:8px;padding:10px;height:340px;overflow:auto}
+    .me{text-align:right;color:#0d9488}.bot{color:#222}
+    button{margin:4px 4px 0 0;padding:8px;border:1px solid #0d9488;background:#fff;border-radius:6px}
+    input{padding:8px;width:70%}
+  </style>
+</head>
+<body>
+  <h3>SmileCare Booking</h3>
+  <div id="chat"></div>
+  <input id="msg" placeholder="e.g. cleaning on Saturday">
+  <button onclick="send()">Send</button>
+
+<script>
+const chat = document.getElementById("chat");
+const add = (text, cls) => { chat.innerHTML += `<p class="${cls}">${text}</p>`; chat.scrollTop = chat.scrollHeight; };
+
+// FRONTEND -> BACKEND: fetch() sends a request to a URL and waits for the answer
+async function send() {
+  const box = document.getElementById("msg");
+  const message = box.value.trim(); if (!message) return;
+  add(message, "me"); box.value = "";
+
+  const res = await fetch("/chat", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({message})
+  });
+  const data = await res.json();          // {reply, ui}
+  add(data.reply, "bot");
+  if (data.ui && data.ui.type === "slots") showSlots(data.ui.slots);
+}
+
+function showSlots(slots) {
+  const wrap = document.createElement("div");
+  slots.forEach(s => {
+    const b = document.createElement("button");
+    b.textContent = `${s.doctor} · ${s.date} ${s.time}`;
+    b.onclick = () => book(s.id);
+    wrap.appendChild(b);
+  });
+  chat.appendChild(wrap);
+}
+
+async function book(slot_id) {
+  const name = prompt("Your name?"); if (!name) return;
+  const res = await fetch("/book", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({slot_id, name})
+  });
+  const data = await res.json();
+  add(data.reply, "bot");
+}
+</script>
+</body>
+</html>
