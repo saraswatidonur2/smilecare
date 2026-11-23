@@ -16,6 +16,9 @@
     input{padding:8px;width:65%}
     .pay{border:1px solid var(--brand);border-radius:8px;padding:10px;margin:8px 0;background:#f0fdfa}
     .pay small{color:#666}
+    .ok{border:1px solid #16a34a;border-radius:8px;padding:12px;margin:8px 0;background:#f0fdf4}
+    .ok h4{margin:0 0 8px;color:#15803d}
+    .ok div{margin:3px 0;font-size:14px}
   </style>
 </head>
 <body>
@@ -38,6 +41,7 @@ const scroll = () => { chat.scrollTop = chat.scrollHeight; };
 function add(text, cls) {
   const p = document.createElement("p"); p.className = cls; p.textContent = text;   // textContent = safe from injected HTML
   chat.appendChild(p); scroll();
+  return p;
 }
 const count = () => { used++; document.getElementById("used").textContent = used; };
 const resetCount = () => { used = 0; document.getElementById("used").textContent = 0; };
@@ -121,20 +125,35 @@ function showPayment(c) {
   chat.appendChild(card); scroll();
 }
 
+let failNote = null;   // the "payment failed" line; removed as soon as the patient retries or pays
+
 async function doPay(c, card, success) {
   card.remove();
   const r = await post("/pay-demo", {order_id: c.order_id, success});
-  add(r.reply, "bot");
+  if (failNote) { failNote.remove(); failNote = null; }
   if (r.ok) {
     journeyDone = true;
-    const link = document.createElement("a");
-    link.href = `/calendar/${c.order_id}`; link.textContent = "Add to calendar";
-    const p = document.createElement("p"); p.appendChild(link); chat.appendChild(p); scroll();
+    showConfirmation(r);
   } else if (r.retry) {
+    failNote = add(r.reply, "bot");   // slot stays held; the patient can pay again
     showPayment(c);
   } else {
+    add(r.reply, "bot");
     journeyDone = true;
   }
+}
+
+// Clean success card with the patient's own booking details
+function showConfirmation(r) {
+  const d = r.details, card = document.createElement("div"); card.className = "ok";
+  const title = document.createElement("h4"); title.textContent = r.reply; card.appendChild(title);
+  [["Name", d.name], ["Mobile", d.mobile], ["Service", d.service], ["Doctor", d.doctor],
+   ["Date", d.date], ["Time", d.time], ["Paid", "\u20b9" + d.amount], ["Receipt", d.receipt]].forEach(([k, v]) => {
+    const row = document.createElement("div"); row.textContent = k + ": " + v; card.appendChild(row);
+  });
+  const link = document.createElement("a");
+  link.href = `/calendar/${d.receipt}`; link.textContent = "Add to calendar";
+  card.appendChild(link); chat.appendChild(card); scroll();
 }
 </script>
 </body>

@@ -139,6 +139,15 @@ def understand(text):
     return {"service": find_service(text), "doctor": find_doctor(text),
             "day": find_day(text), "part": find_part_of_day(text)}
 
+
+def booking_details(order_id):
+    """The patient's own booking summary, shown after successful payment."""
+    o = ORDERS[order_id]
+    slot = get_slot(o["slot_id"])
+    when = appointment_start(slot)
+    return {"name": o["name"], "mobile": o["mobile"], "service": o["service"], "doctor": slot["doctor"],
+            "date": when.strftime("%a %d %b %Y"), "time": slot["time"], "amount": AMOUNT, "receipt": order_id}
+
 # ---------- routes ----------
 @app.get("/")
 def home():
@@ -261,7 +270,8 @@ def pay_demo(data: PayIn):
         return {"ok": False, "reply": "Order not found."}
     slot = get_slot(order["slot_id"])
     if order["status"] == "paid":                       # idempotent: repeat calls never double-book
-        return {"ok": True, "reply": "Already confirmed.", "order_id": data.order_id}
+        return {"ok": True, "order_id": data.order_id, "reply": "Payment successful. Your slot is booked successfully.",
+                "details": booking_details(data.order_id)}
     if not data.success:
         order["status"] = "failed"
         if holds_valid(order["slot_id"], order["mobile"]):
@@ -273,9 +283,8 @@ def pay_demo(data: PayIn):
     order["status"] = "paid"
     HOLDS.pop(order["slot_id"], None)
     VERIFIED.discard(order["mobile"])
-    when = appointment_start(slot)
-    return {"ok": True, "order_id": data.order_id,
-            "reply": f"Payment received. Confirmed! {order['name']}, {order['service']} with {slot['doctor']} on {when.strftime('%a %d %b')} at {slot['time']}. Receipt: {data.order_id}"}
+    return {"ok": True, "order_id": data.order_id, "reply": "Payment successful. Your slot is booked successfully.",
+            "details": booking_details(data.order_id)}
 
 @app.get("/calendar/{order_id}")
 def calendar(order_id: str):
