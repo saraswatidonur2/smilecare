@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Doctor dashboard</title>
+  <style>
+    body{font-family:sans-serif;max-width:800px;margin:20px auto;padding:0 12px}
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th,td{border-bottom:1px solid #ddd;padding:8px;text-align:left;font-size:14px}
+    th{background:#f0fdfa}
+    select{padding:6px}
+    .paid{color:#0d9488;font-weight:600}
+  </style>
+</head>
+<body>
+  <h2>SmileCare: today's and upcoming appointments</h2>
+  <label>Doctor: <select id="doc"><option value="">All doctors</option></select></label>
+  <span id="msg"></span>
+  <table>
+    <thead><tr><th>Date</th><th>Time</th><th>Patient</th><th>Mobile</th><th>Doctor</th><th>Reason</th><th>Payment</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+<script>
+const key = new URLSearchParams(location.search).get("key") || "";
+const sel = document.getElementById("doc");
+let filled = false;
+
+function cell(tr, text, cls) { const td = document.createElement("td"); td.textContent = text; if (cls) td.className = cls; tr.appendChild(td); }
+
+async function load() {
+  const res = await fetch(`/api/appointments?key=${encodeURIComponent(key)}&doctor=${encodeURIComponent(sel.value)}`);
+  const data = await res.json();
+  const msg = document.getElementById("msg"), body = document.getElementById("rows");
+  if (!data.ok) { msg.textContent = " " + data.reply + " Open this page as /dashboard?key=YOUR_KEY"; body.innerHTML = ""; return; }
+  msg.textContent = "";
+  if (!filled) { data.doctors.forEach(d => { const o = document.createElement("option"); o.value = d; o.textContent = d; sel.appendChild(o); }); filled = true; }
+  body.innerHTML = "";
+  if (!data.appointments.length) { const tr = document.createElement("tr"); cell(tr, "No paid appointments yet."); body.appendChild(tr); return; }
+  data.appointments.forEach(a => {
+    const tr = document.createElement("tr");
+    [a.date, a.time, a.patient, a.mobile, a.doctor, a.service].forEach(v => cell(tr, v));
+    cell(tr, a.status, "paid"); body.appendChild(tr);
+  });
+}
+sel.onchange = load;
+load(); setInterval(load, 5000);   // refreshes by itself every 5 seconds
+</script>
+</body>
+</html>

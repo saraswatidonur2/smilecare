@@ -1,5 +1,5 @@
-# STEP 4: understands free-text requests WITHOUT an AI key (rule-based), plus everything from Step 3.
-import random, re, time, uuid
+# STEP 5: embeddable widget (/widget.js), sample clinic site (/site), doctor dashboard (/dashboard), plus Steps 1-4.
+import os, random, re, time, uuid
 from datetime import datetime, timedelta
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, Response
@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 app = FastAPI()
 DEMO_MODE = True        # OTP shown on screen; payment is simulated
+DASHBOARD_KEY = os.environ.get("DASHBOARD_KEY", "demo123")   # simple access key for the doctor dashboard
 HOLD_SECONDS = 300      # a slot is held for 5 minutes while the patient pays
 AMOUNT = 500            # consultation fee in rupees
 
@@ -142,6 +143,37 @@ def understand(text):
 @app.get("/")
 def home():
     return FileResponse("index.html")
+
+
+@app.get("/widget.js")
+def widget_js():
+    return FileResponse("widget.js", media_type="application/javascript")
+
+@app.get("/site")
+def sample_site():
+    return FileResponse("site.html")
+
+@app.get("/dashboard")
+def dashboard_page():
+    return FileResponse("dashboard.html")
+
+@app.get("/api/appointments")
+def appointments(key: str = "", doctor: str = ""):
+    if key != DASHBOARD_KEY:
+        return {"ok": False, "reply": "Wrong or missing key."}
+    rows = []
+    for order_id, o in ORDERS.items():
+        if o["status"] != "paid":
+            continue
+        slot = get_slot(o["slot_id"])
+        if doctor and slot["doctor"] != doctor:
+            continue
+        when = appointment_start(slot)
+        rows.append({"sort": when.isoformat(), "order_id": order_id, "patient": o["name"], "service": o["service"],
+                     "doctor": slot["doctor"], "date": when.strftime("%a %d %b"), "time": slot["time"],
+                     "mobile": "XXXXXX" + o["mobile"][-4:], "status": f"Paid ₹{AMOUNT}"})
+    rows.sort(key=lambda r: r["sort"])
+    return {"ok": True, "doctors": sorted({s["doctor"] for s in SLOTS}), "appointments": rows}
 
 @app.post("/chat")
 def chat(data: ChatIn):

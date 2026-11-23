@@ -4,15 +4,17 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SmileCare Booking</title>
   <style>
+    :root{--brand:#0d9488}
+    body.embed{margin:8px auto}
     body{font-family:sans-serif;max-width:420px;margin:20px auto;padding:0 10px}
     .head{display:flex;justify-content:space-between;align-items:center}
-    #counter{font-size:13px;color:#0d9488}
+    #counter{font-size:13px;color:var(--brand)}
     #chat{border:1px solid #ccc;border-radius:8px;padding:10px;height:340px;overflow:auto}
     #chat p{margin:6px 0}
-    .me{text-align:right;color:#0d9488}.bot{color:#222}
-    button{margin:4px 4px 0 0;padding:8px;border:1px solid #0d9488;background:#fff;border-radius:6px}
+    .me{text-align:right;color:var(--brand)}.bot{color:#222}
+    button{margin:4px 4px 0 0;padding:8px;border:1px solid var(--brand);background:#fff;border-radius:6px}
     input{padding:8px;width:65%}
-    .pay{border:1px solid #0d9488;border-radius:8px;padding:10px;margin:8px 0;background:#f0fdfa}
+    .pay{border:1px solid var(--brand);border-radius:8px;padding:10px;margin:8px 0;background:#f0fdfa}
     .pay small{color:#666}
   </style>
 </head>
@@ -23,6 +25,11 @@
   <button onclick="send()">Send</button>
 
 <script>
+// Widget options come from the URL: ?embed=1&color=%230d9488&clinic=SmileCare
+const params = new URLSearchParams(location.search);
+if (params.get("embed")) document.body.classList.add("embed");
+if (params.get("color")) document.documentElement.style.setProperty("--brand", params.get("color"));
+if (params.get("clinic")) document.querySelector(".head h3").textContent = params.get("clinic") + " Booking";
 const chat = document.getElementById("chat");
 let used = 0;
 let journeyDone = false;   // after a finished booking, the next request starts a fresh count
@@ -109,7 +116,9 @@ function showPayment(c) {
   const fail = document.createElement("button"); fail.textContent = "Demo only: simulate failed payment";
   pay.onclick = () => doPay(c, card, true);
   fail.onclick = () => doPay(c, card, false);
-  card.append(t, pay, fail); chat.appendChild(card); scroll();
+  // failure button is shown only when the page is opened with ?demo
+  card.append(t, pay); if (location.search.includes("demo")) card.append(fail);
+  chat.appendChild(card); scroll();
 }
 
 async function doPay(c, card, success) {
