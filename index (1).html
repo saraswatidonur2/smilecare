@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SmileCare Booking</title>
+  <style>
+    :root{--brand:#0d9488}
+    body.embed{margin:8px auto}
+    body{font-family:sans-serif;max-width:420px;margin:20px auto;padding:0 10px}
+    .head{display:flex;justify-content:space-between;align-items:center}
+    #counter{font-size:13px;color:var(--brand)}
+    #chat{border:1px solid #ccc;border-radius:8px;padding:10px;height:340px;overflow:auto}
+    #chat p{margin:6px 0}
+    .me{text-align:right;color:var(--brand)}.bot{color:#222}
+    button{margin:4px 4px 0 0;padding:8px;border:1px solid var(--brand);background:#fff;border-radius:6px}
+    input{padding:8px;width:65%}
+    .pay{border:1px solid var(--brand);border-radius:8px;padding:10px;margin:8px 0;background:#f0fdfa}
+    .pay small{color:#666}
+    .ok{border:1px solid #16a34a;border-radius:8px;padding:12px;margin:8px 0;background:#f0fdf4}
+    .ok h4{margin:0 0 8px;color:#15803d}
+    .ok div{margin:3px 0;font-size:14px}
+  </style>
+</head>
+<body>
+  <div class="head"><h3>SmileCare Booking</h3><span id="counter">Messages used: <b id="used">0</b>/5</span></div>
+  <div id="chat"></div>
+  <input id="msg" placeholder="e.g. cleaning with Dr. Rao on Saturday morning">
+  <button onclick="send()">Send</button>
+
+<script>
+// Widget options come from the URL: ?embed=1&color=%230d9488&clinic=SmileCare
+const params = new URLSearchParams(location.search);
+if (params.get("embed")) document.body.classList.add("embed");
+if (params.get("color")) document.documentElement.style.setProperty("--brand", params.get("color"));
+if (params.get("clinic")) document.querySelector(".head h3").textContent = params.get("clinic") + " Booking";
+const chat = document.getElementById("chat");
+let used = 0;
+let journeyDone = false;   // after a finished booking, the next request starts a fresh count
+
+const scroll = () => { chat.scrollTop = chat.scrollHeight; };
+function add(text, cls) {
+  const p = document.createElement("p"); p.className = cls; p.textContent = text;   // textContent = safe from injected HTML
+  chat.appendChild(p); scroll();
+  return p;
+}
+const count = () => { used++; document.getElementById("used").textContent = used; };
+const resetCount = () => { used = 0; document.getElementById("used").textContent = 0; };
+
+async function post(url, body) {
+  const res = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
+  return res.json();
+}
+
+// Shows an input inside the chat and waits for the patient's answer. Retries don't use up the message budget.
+function ask(label, placeholder, counts = true) {
+  return new Promise(resolve => {
+    add(label, "bot");
+    const wrap = document.createElement("div");
+    const inp = document.createElement("input"); inp.placeholder = placeholder;
+    const btn = document.createElement("button"); btn.textContent = "Send";
+    btn.onclick = () => {
+      const v = inp.value.trim(); if (!v) return;
+      wrap.remove(); add(v, "me"); if (counts) count(); resolve(v);
+    };
+    wrap.append(inp, btn); chat.appendChild(wrap); inp.focus(); scroll();
+  });
+}
+
+async function send() {
+  const box = document.getElementById("msg");
+  const message = box.value.trim(); if (!message) return;
+  if (journeyDone) { resetCount(); journeyDone = false; }
+  add(message, "me"); count(); box.value = "";
+  const data = await post("/chat", {message});
+  add(data.reply, "bot");
+  if (data.ui && data.ui.type === "slots") showSlots(data.ui.slots, data.ui.service);
+}
+
+function showSlots(slots, service) {
+  const wrap = document.createElement("div");
+  slots.forEach(s => {
+    const b = document.createElement("button");
+    b.textContent = `${s.doctor} · ${s.date} ${s.time}`;
+    b.onclick = () => { wrap.remove(); book(s.id, service); };
+    wrap.appendChild(b);
+  });
+  chat.appendChild(wrap); scroll();
+}
+
+// Booking flow: mobile -> OTP -> name -> pay -> confirmed
+async function book(slot_id, service) {
+  const mobile = await ask("Enter your mobile number", "10-digit mobile");
+  const o = await post("/send-otp", {slot_id, mobile});
+  add(o.reply, "bot");
+  if (!o.ok) { journeyDone = true; return; }
+
+  let verified = false;
+  for (let i = 0; i < 3 && !verified; i++) {
+    const otp = await ask("Enter the 6-digit OTP", "OTP", i === 0);
+    const v = await post("/verify-otp", {mobile, otp});
+    add(v.reply, "bot");
+    verified = v.ok;
+    if (!v.ok && v.reply.includes("start again")) { journeyDone = true; return; }
+  }
+  if (!verified) { journeyDone = true; return; }
+
+  const name = await ask("Your name", "Full name");
+  const c = await post("/create-order", {slot_id, name, mobile, service});
+  add(c.reply, "bot");
+  if (!c.ok) { journeyDone = true; return; }
+  showPayment(c);
+}
+
+// Simulated checkout card (real version: Razorpay checkout opens here)
+function showPayment(c) {
+  const card = document.createElement("div"); card.className = "pay";
+  const t = document.createElement("div");
+  t.innerHTML = `<b>Pay ₹${c.amount}</b> <small>(test mode · order ${c.order_id})</small>`;
+  const pay = document.createElement("button"); pay.textContent = `Pay ₹${c.amount}`;
+  const fail = document.createElement("button"); fail.textContent = "Demo only: simulate failed payment";
+  pay.onclick = () => doPay(c, card, true);
+  fail.onclick = () => doPay(c, card, false);
+  // failure button is shown only when the page is opened with ?demo
+  card.append(t, pay); if (location.search.includes("demo")) card.append(fail);
+  chat.appendChild(card); scroll();
+}
+
+let failNote = null;   // the "payment failed" line; removed as soon as the patient retries or pays
+
+async function doPay(c, card, success) {
+  card.remove();
+  const r = await post("/pay-demo", {order_id: c.order_id, success});
+  if (failNote) { failNote.remove(); failNote = null; }
+  if (r.ok) {
+    journeyDone = true;
+    showConfirmation(r);
+  } else if (r.retry) {
+    failNote = add(r.reply, "bot");   // slot stays held; the patient can pay again
+    showPayment(c);
+  } else {
+    add(r.reply, "bot");
+    journeyDone = true;
+  }
+}
+
+// Clean success card with the patient's own booking details
+function showConfirmation(r) {
+  const d = r.details, card = document.createElement("div"); card.className = "ok";
+  const title = document.createElement("h4"); title.textContent = r.reply; card.appendChild(title);
+  [["Name", d.name], ["Mobile", d.mobile], ["Service", d.service], ["Doctor", d.doctor],
+   ["Date", d.date], ["Time", d.time], ["Paid", "\u20b9" + d.amount], ["Receipt", d.receipt]].forEach(([k, v]) => {
+    const row = document.createElement("div"); row.textContent = k + ": " + v; card.appendChild(row);
+  });
+  const link = document.createElement("a");
+  link.href = `/calendar/${d.receipt}`; link.textContent = "Add to calendar";
+  card.appendChild(link); chat.appendChild(card); scroll();
+}
+</script>
+</body>
+</html>
