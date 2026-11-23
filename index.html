@@ -2,37 +2,54 @@
 <html>
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Mini Booking Demo</title>
+  <title>SmileCare Booking</title>
   <style>
     body{font-family:sans-serif;max-width:420px;margin:20px auto;padding:0 10px}
+    .head{display:flex;justify-content:space-between;align-items:center}
+    #counter{font-size:13px;color:#0d9488}
     #chat{border:1px solid #ccc;border-radius:8px;padding:10px;height:340px;overflow:auto}
     .me{text-align:right;color:#0d9488}.bot{color:#222}
     button{margin:4px 4px 0 0;padding:8px;border:1px solid #0d9488;background:#fff;border-radius:6px}
-    input{padding:8px;width:70%}
+    input{padding:8px;width:65%}
   </style>
 </head>
 <body>
-  <h3>SmileCare Booking</h3>
+  <div class="head"><h3>SmileCare Booking</h3><span id="counter">Messages used: <b id="used">0</b>/5</span></div>
   <div id="chat"></div>
   <input id="msg" placeholder="e.g. cleaning on Saturday">
   <button onclick="send()">Send</button>
 
 <script>
 const chat = document.getElementById("chat");
+let used = 0;
 const add = (text, cls) => { chat.innerHTML += `<p class="${cls}">${text}</p>`; chat.scrollTop = chat.scrollHeight; };
+const count = () => { used++; document.getElementById("used").textContent = used; };
 
-// FRONTEND -> BACKEND: fetch() sends a request to a URL and waits for the answer
+async function post(url, body) {
+  const res = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
+  return res.json();
+}
+
+// Shows an input inside the chat and waits for the patient to answer
+function ask(label, placeholder) {
+  return new Promise(resolve => {
+    add(label, "bot");
+    const wrap = document.createElement("div");
+    const inp = document.createElement("input"); inp.placeholder = placeholder;
+    const btn = document.createElement("button"); btn.textContent = "Send";
+    btn.onclick = () => {
+      const v = inp.value.trim(); if (!v) return;
+      wrap.remove(); add(v, "me"); count(); resolve(v);
+    };
+    wrap.append(inp, btn); chat.appendChild(wrap); inp.focus(); chat.scrollTop = chat.scrollHeight;
+  });
+}
+
 async function send() {
   const box = document.getElementById("msg");
   const message = box.value.trim(); if (!message) return;
-  add(message, "me"); box.value = "";
-
-  const res = await fetch("/chat", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({message})
-  });
-  const data = await res.json();          // {reply, ui}
+  add(message, "me"); count(); box.value = "";
+  const data = await post("/chat", {message});
   add(data.reply, "bot");
   if (data.ui && data.ui.type === "slots") showSlots(data.ui.slots);
 }
@@ -48,15 +65,26 @@ function showSlots(slots) {
   chat.appendChild(wrap);
 }
 
+// Booking flow: mobile -> OTP -> name -> book
 async function book(slot_id) {
-  const name = prompt("Your name?"); if (!name) return;
-  const res = await fetch("/book", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({slot_id, name})
-  });
-  const data = await res.json();
-  add(data.reply, "bot");
+  const mobile = await ask("Enter your mobile number", "10-digit mobile");
+  const o = await post("/send-otp", {slot_id, mobile});
+  add(o.reply, "bot");
+  if (!o.ok) return;
+
+  let verified = false;
+  for (let i = 0; i < 3 && !verified; i++) {
+    const otp = await ask("Enter the 6-digit OTP", "OTP");
+    const v = await post("/verify-otp", {mobile, otp});
+    add(v.reply, "bot");
+    verified = v.ok;
+    if (!v.ok && v.reply.includes("start again")) return;
+  }
+  if (!verified) return;
+
+  const name = await ask("Your name", "Full name");
+  const b = await post("/book", {slot_id, name, mobile});
+  add(b.reply, "bot");
 }
 </script>
 </body>
