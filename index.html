@@ -19,7 +19,7 @@
 <body>
   <div class="head"><h3>SmileCare Booking</h3><span id="counter">Messages used: <b id="used">0</b>/5</span></div>
   <div id="chat"></div>
-  <input id="msg" placeholder="e.g. cleaning on Saturday">
+  <input id="msg" placeholder="e.g. cleaning with Dr. Rao on Saturday morning">
   <button onclick="send()">Send</button>
 
 <script>
@@ -62,22 +62,22 @@ async function send() {
   add(message, "me"); count(); box.value = "";
   const data = await post("/chat", {message});
   add(data.reply, "bot");
-  if (data.ui && data.ui.type === "slots") showSlots(data.ui.slots);
+  if (data.ui && data.ui.type === "slots") showSlots(data.ui.slots, data.ui.service);
 }
 
-function showSlots(slots) {
+function showSlots(slots, service) {
   const wrap = document.createElement("div");
   slots.forEach(s => {
     const b = document.createElement("button");
     b.textContent = `${s.doctor} · ${s.date} ${s.time}`;
-    b.onclick = () => { wrap.remove(); book(s.id); };
+    b.onclick = () => { wrap.remove(); book(s.id, service); };
     wrap.appendChild(b);
   });
   chat.appendChild(wrap); scroll();
 }
 
 // Booking flow: mobile -> OTP -> name -> pay -> confirmed
-async function book(slot_id) {
+async function book(slot_id, service) {
   const mobile = await ask("Enter your mobile number", "10-digit mobile");
   const o = await post("/send-otp", {slot_id, mobile});
   add(o.reply, "bot");
@@ -94,7 +94,7 @@ async function book(slot_id) {
   if (!verified) { journeyDone = true; return; }
 
   const name = await ask("Your name", "Full name");
-  const c = await post("/create-order", {slot_id, name, mobile});
+  const c = await post("/create-order", {slot_id, name, mobile, service});
   add(c.reply, "bot");
   if (!c.ok) { journeyDone = true; return; }
   showPayment(c);
@@ -106,7 +106,7 @@ function showPayment(c) {
   const t = document.createElement("div");
   t.innerHTML = `<b>Pay ₹${c.amount}</b> <small>(test mode · order ${c.order_id})</small>`;
   const pay = document.createElement("button"); pay.textContent = `Pay ₹${c.amount}`;
-  const fail = document.createElement("button"); fail.textContent = "Simulate failed payment";
+  const fail = document.createElement("button"); fail.textContent = "Demo only: simulate failed payment";
   pay.onclick = () => doPay(c, card, true);
   fail.onclick = () => doPay(c, card, false);
   card.append(t, pay, fail); chat.appendChild(card); scroll();
