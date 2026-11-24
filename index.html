@@ -16,6 +16,7 @@
     input{padding:8px;width:65%}
     .pay{border:1px solid var(--brand);border-radius:8px;padding:10px;margin:8px 0;background:#f0fdfa}
     .pay small{color:#666}
+    .timer{font-size:13px;color:#b45309;margin:4px 0}
     .ok{border:1px solid #16a34a;border-radius:8px;padding:12px;margin:8px 0;background:#f0fdf4}
     .ok h4{margin:0 0 8px;color:#15803d}
     .ok div{margin:3px 0;font-size:14px}
@@ -111,17 +112,32 @@ async function book(slot_id, service) {
   showPayment(c);
 }
 
-// Simulated checkout card (real version: Razorpay checkout opens here)
+// Simulated checkout card (real version: Razorpay checkout opens here). Shows a live 5-minute hold timer.
 function showPayment(c) {
   const card = document.createElement("div"); card.className = "pay";
-  const t = document.createElement("div");
-  t.innerHTML = `<b>Pay ₹${c.amount}</b> <small>(test mode · order ${c.order_id})</small>`;
-  const pay = document.createElement("button"); pay.textContent = `Pay ₹${c.amount}`;
+  const t = document.createElement("div"); t.style.fontWeight = "600";
+  t.textContent = `Pay \u20b9${c.amount} (test mode, order ${c.order_id})`;
+  const timer = document.createElement("div"); timer.className = "timer";
+  const pay = document.createElement("button"); pay.textContent = `Pay \u20b9${c.amount}`;
   const fail = document.createElement("button"); fail.textContent = "Demo only: simulate failed payment";
-  pay.onclick = () => doPay(c, card, true);
-  fail.onclick = () => doPay(c, card, false);
+
+  let left = c.hold_left;
+  const show = () => { timer.textContent = "Your slot is held for you: " + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0"); };
+  show();
+  const tick = setInterval(() => {
+    left--;
+    if (left <= 0) {
+      clearInterval(tick); card.remove();
+      add("Your 5-minute slot hold has expired. Please start again.", "bot");
+      journeyDone = true; return;
+    }
+    show();
+  }, 1000);
+
+  pay.onclick = () => { clearInterval(tick); doPay(c, card, true); };
+  fail.onclick = () => { clearInterval(tick); doPay(c, card, false); };
   // failure button is shown only when the page is opened with ?demo
-  card.append(t, pay); if (location.search.includes("demo")) card.append(fail);
+  card.append(t, timer, pay); if (location.search.includes("demo")) card.append(fail);
   chat.appendChild(card); scroll();
 }
 
@@ -136,7 +152,7 @@ async function doPay(c, card, success) {
     showConfirmation(r);
   } else if (r.retry) {
     failNote = add(r.reply, "bot");   // slot stays held; the patient can pay again
-    showPayment(c);
+    showPayment({...c, hold_left: r.hold_left});
   } else {
     add(r.reply, "bot");
     journeyDone = true;

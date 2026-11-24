@@ -1,4 +1,4 @@
-# STEP 5: embeddable widget (/widget.js), sample clinic site (/site), doctor dashboard (/dashboard), plus Steps 1-4.
+# STEP 6 (payment messages + hold timer on top of Step 5): embeddable widget (/widget.js), sample clinic site (/site), doctor dashboard (/dashboard), plus Steps 1-4.
 import os, random, re, time, uuid
 from datetime import datetime, timedelta
 from fastapi import FastAPI
@@ -57,6 +57,11 @@ def held_by_other(slot_id, mobile=None):
         HOLDS.pop(slot_id, None)
         return False
     return mobile is None or h["mobile"] != mobile
+
+def hold_left(slot_id):
+    """Seconds left on the current hold (0 if none)."""
+    h = HOLDS.get(slot_id)
+    return max(0, int(h["expires"] - time.time())) if h else 0
 
 def holds_valid(slot_id, mobile):
     h = HOLDS.get(slot_id)
@@ -259,7 +264,7 @@ def create_order(data: OrderIn):
     order_id = "ord_" + uuid.uuid4().hex[:8]
     ORDERS[order_id] = {"slot_id": data.slot_id, "name": data.name, "mobile": data.mobile,
                         "service": data.service, "status": "created"}
-    return {"ok": True, "order_id": order_id, "amount": AMOUNT,
+    return {"ok": True, "order_id": order_id, "amount": AMOUNT, "hold_left": hold_left(data.slot_id),
             "reply": f"Please pay ₹{AMOUNT} to confirm your appointment."}
 
 @app.post("/pay-demo")
@@ -270,20 +275,22 @@ def pay_demo(data: PayIn):
         return {"ok": False, "reply": "Order not found."}
     slot = get_slot(order["slot_id"])
     if order["status"] == "paid":                       # idempotent: repeat calls never double-book
-        return {"ok": True, "order_id": data.order_id, "reply": "Payment successful. Your slot is booked successfully.",
+        return {"ok": True, "order_id": data.order_id, "reply": "Payment successful. Your payment is verified and your slot is booked.",
                 "details": booking_details(data.order_id)}
     if not data.success:
         order["status"] = "failed"
         if holds_valid(order["slot_id"], order["mobile"]):
-            return {"ok": False, "retry": True, "reply": "Payment failed. Your slot is still held, please try again."}
-        return {"ok": False, "reply": "Payment failed and your slot hold expired. Please start again."}
+            left = hold_left(order["slot_id"])
+            return {"ok": False, "retry": True, "hold_left": left,
+                    "reply": f"Payment unsuccessful. Your slot is held for you for {left // 60}:{left % 60:02d} more. Please try again."}
+        return {"ok": False, "reply": "Payment unsuccessful and your 5-minute slot hold has expired. Please start again."}
     if slot["booked"] or not holds_valid(order["slot_id"], order["mobile"]):
         return {"ok": False, "reply": "Your slot hold expired. Please start again."}
     slot["booked"] = True                               # booked ONLY after payment succeeds
     order["status"] = "paid"
     HOLDS.pop(order["slot_id"], None)
     VERIFIED.discard(order["mobile"])
-    return {"ok": True, "order_id": data.order_id, "reply": "Payment successful. Your slot is booked successfully.",
+    return {"ok": True, "order_id": data.order_id, "reply": "Payment successful. Your payment is verified and your slot is booked.",
             "details": booking_details(data.order_id)}
 
 @app.get("/calendar/{order_id}")
