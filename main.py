@@ -1,10 +1,19 @@
-# STEP 7: English / Hindi / Kannada, cancel + refund (test mode), dashboard statuses, on top of Steps 1-6.
-# No AI key needed: requests are understood with rules (keywords in all three languages).
-import os, random, re, time, uuid
+# STEP 8: all major Indian languages, reschedule, reminders, QR check-in pass, smart slot recovery (on top of Steps 1-7).
+# No AI key needed. English/Hindi/Kannada use hand-written text; other languages use the free deep-translator package.
+import asyncio, html, io, os, random, re, time, uuid
 from datetime import datetime, timedelta
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel
+
+try:
+    from deep_translator import GoogleTranslator      # pip install deep-translator
+except Exception:
+    GoogleTranslator = None
+try:
+    import segno                                       # pip install segno  (QR codes)
+except Exception:
+    segno = None
 
 app = FastAPI()
 DEMO_MODE = True        # OTP shown on screen; payment and refund are simulated
@@ -53,6 +62,24 @@ class CancelIn(BaseModel):
     order_id: str
     mobile: str
     lang: str = "en"
+class TranslateIn(BaseModel):
+    lang: str
+    texts: list
+class ReschedOptIn(BaseModel):
+    order_id: str
+    mobile: str
+    lang: str = "en"
+class ReschedIn(BaseModel):
+    order_id: str
+    mobile: str
+    slot_id: int
+    lang: str = "en"
+class RecoverIn(BaseModel):
+    slot_id: int
+    service: str = "Dental visit"
+    lang: str = "en"
+class KeyIn(BaseModel):
+    key: str
 class StatusIn(BaseModel):
     key: str
     order_id: str
@@ -164,6 +191,26 @@ MSG = {
   "en": "This appointment can't be cancelled.",
   "hi": "यह अपॉइंटमेंट रद्द नहीं की जा सकती।",
   "kn": "ಈ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ರದ್ದುಮಾಡಲಾಗುವುದಿಲ್ಲ."},
+ "resched_pick": {
+  "en": "Choose a new time:",
+  "hi": "नया समय चुनें:",
+  "kn": "ಹೊಸ ಸಮಯ ಆಯ್ಕೆಮಾಡಿ:"},
+ "resched_none": {
+  "en": "No other slots are free right now.",
+  "hi": "अभी कोई और स्लॉट खाली नहीं है।",
+  "kn": "ಈಗ ಬೇರೆ ಸ್ಲಾಟ್ ಖಾಲಿ ಇಲ್ಲ."},
+ "resched_ok": {
+  "en": "Appointment rescheduled. Your payment carries over, so no new payment is needed.",
+  "hi": "अपॉइंटमेंट का समय बदल दिया गया। आपका भुगतान आगे जोड़ दिया गया है, नया भुगतान नहीं चाहिए।",
+  "kn": "ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಸಮಯ ಬದಲಾಗಿದೆ. ನಿಮ್ಮ ಪಾವತಿ ಮುಂದುವರಿಯುತ್ತದೆ, ಹೊಸ ಪಾವತಿ ಬೇಕಿಲ್ಲ."},
+ "resched_no": {
+  "en": "This appointment can't be rescheduled.",
+  "hi": "यह अपॉइंटमेंट बदली नहीं जा सकती।",
+  "kn": "ಈ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಬದಲಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ."},
+ "recover_head": {
+  "en": "Your slot hold ended and the slot was released for other patients. Here are the nearest alternatives:",
+  "hi": "आपका स्लॉट होल्ड समाप्त हो गया और स्लॉट दूसरे मरीज़ों के लिए खोल दिया गया। सबसे नज़दीकी विकल्प ये हैं:",
+  "kn": "ನಿಮ್ಮ ಸ್ಲಾಟ್ ಕಾಯ್ದಿರಿಕೆ ಮುಗಿದು ಸ್ಲಾಟ್ ಇತರ ರೋಗಿಗಳಿಗೆ ಬಿಡುಗಡೆಯಾಗಿದೆ. ಹತ್ತಿರದ ಆಯ್ಕೆಗಳು ಇಲ್ಲಿವೆ:"},
 }
 DOC_NAMES = {"Dr. Rao": {"hi": "डॉ. राव", "kn": "ಡಾ. ರಾವ್"}, "Dr. Meena": {"hi": "डॉ. मीना", "kn": "ಡಾ. ಮೀನಾ"}}
 SERVICE_NAMES = {
@@ -180,19 +227,73 @@ DAY_NAMES = {
 PART_NAMES = {"hi": {"morning": "सुबह", "afternoon": "दोपहर", "evening": "शाम"},
               "kn": {"morning": "ಬೆಳಿಗ್ಗೆ", "afternoon": "ಮಧ್ಯಾಹ್ನ", "evening": "ಸಂಜೆ"}}
 
+CURATED = ("en", "hi", "kn")           # hand-written; other languages go through the translation package
+FULL_DAY = {"Mon": "Monday", "Tue": "Tuesday", "Wed": "Wednesday", "Thu": "Thursday", "Fri": "Friday", "Sat": "Saturday", "Sun": "Sunday"}
+_cache = {}
+
+def translate_text(text, target, source="en"):
+    """Translate with the free deep-translator package. If the service is unavailable, the English text is returned."""
+    if not text or target == source:
+        return text
+    key = (text, target, source)
+    if key in _cache:
+        return _cache[key]
+    if GoogleTranslator is None:
+        return text
+    try:
+        out = GoogleTranslator(source=source, target=target).translate(text)
+    except Exception:
+        return text
+    if not out:
+        return text
+    _cache[key] = out
+    return out
+
+def translate_template(template, target, kw=None):
+    """Translate a message with {placeholders}. Values (OTP, mobile, amount...) are protected and never translated."""
+    names = list(dict.fromkeys(re.findall(r"\{(\w+)\}", template)))
+    tokens = {n: f"QQ{i}QQ" for i, n in enumerate(names)}
+    protected = template
+    for n, tok in tokens.items():
+        protected = protected.replace("{" + n + "}", tok)
+    out = translate_text(protected, target)
+    if any(tok not in out for tok in tokens.values()):          # translator damaged a placeholder: stay in English
+        return template.format(**kw) if kw is not None else template
+    for n, tok in tokens.items():
+        out = out.replace(tok, str(kw[n]) if kw is not None else "{" + n + "}")
+    return out
+
 def tr(lang, key, **kw):
     table = MSG[key]
-    return table.get(lang, table["en"]).format(**kw)
+    if lang in table:
+        return table[lang].format(**kw)
+    return translate_template(table["en"], lang, kw)
+
+# script -> language (the dropdown choice wins when it uses the same script, e.g. Marathi or Nepali in Devanagari)
+SCRIPT_RANGES = [("kn", 0x0C80, 0x0CFF), ("te", 0x0C00, 0x0C7F), ("ta", 0x0B80, 0x0BFF), ("ml", 0x0D00, 0x0D7F),
+                 ("or", 0x0B00, 0x0B7F), ("gu", 0x0A80, 0x0AFF), ("pa", 0x0A00, 0x0A7F), ("bn", 0x0980, 0x09FF),
+                 ("hi", 0x0900, 0x097F), ("ur", 0x0600, 0x06FF), ("sat", 0x1C50, 0x1C7F), ("mni-mtei", 0xABC0, 0xABFF)]
+SAME_SCRIPT = {"hi": {"hi", "mr", "ne", "mai", "sa", "gom", "doi", "brx"}, "bn": {"bn", "as"}, "ur": {"ur", "sd", "ks"}}
 
 def detect_lang(text, default):
-    if any("\u0c80" <= ch <= "\u0cff" for ch in text): return "kn"      # Kannada script
-    if any("\u0900" <= ch <= "\u097f" for ch in text): return "hi"      # Devanagari (Hindi)
-    return default if default in ("en", "hi", "kn") else "en"
+    for ch in text:
+        o = ord(ch)
+        for code, lo, hi in SCRIPT_RANGES:
+            if lo <= o <= hi:
+                return default if default in SAME_SCRIPT.get(code, {code}) else code
+    return default or "en"
 
 def doc_name(d, lang): return DOC_NAMES.get(d, {}).get(lang, d)
-def svc_name(s, lang): return SERVICE_NAMES.get(s, {}).get(lang, s)
-def day_name(d, lang): return DAY_NAMES.get(lang, {}).get(d, d)
-def part_name(p, lang): return PART_NAMES.get(lang, {}).get(p, p)
+def svc_name(s, lang):
+    if lang in CURATED: return SERVICE_NAMES.get(s, {}).get(lang, s)
+    return translate_text(s, lang)
+def day_name(d, lang):
+    if lang in DAY_NAMES: return DAY_NAMES[lang].get(d, d)
+    if lang == "en": return d
+    return translate_text(FULL_DAY.get(d, d), lang)
+def part_name(p, lang):
+    if lang in PART_NAMES: return PART_NAMES[lang].get(p, p)
+    return p if lang == "en" else translate_text(p, lang)
 
 # ---------- helpers ----------
 def get_slot(slot_id):
@@ -227,6 +328,10 @@ def appointment_start(slot):
     t = datetime.strptime(slot["time"], "%I:%M %p")
     return day.replace(hour=t.hour, minute=t.minute, second=0, microsecond=0)
 
+def order_start(o):
+    """The appointment time fixed when the booking was paid (or rescheduled)."""
+    return o.get("start") or appointment_start(get_slot(o["slot_id"]))
+
 def fmt_date(when, lang):
     if lang == "en":
         return when.strftime("%a %d %b %Y")
@@ -236,7 +341,7 @@ def booking_details(order_id, lang="en"):
     o = ORDERS[order_id]
     slot = get_slot(o["slot_id"])
     return {"name": o["name"], "mobile": o["mobile"], "service": svc_name(o["service"], lang),
-            "doctor": doc_name(slot["doctor"], lang), "date": fmt_date(appointment_start(slot), lang),
+            "doctor": doc_name(slot["doctor"], lang), "date": fmt_date(order_start(o), lang),
             "time": slot["time"], "amount": AMOUNT, "receipt": order_id}
 
 # ---------- understanding free text (English, Hindi, Kannada; no AI key needed) ----------
@@ -335,14 +440,30 @@ def sample_site():
 def dashboard_page():
     return FileResponse("dashboard.html")
 
+CENTER_HOUR = {"morning": 9, "afternoon": 14, "evening": 18}
+def slot_hour(slot):
+    return datetime.strptime(slot["time"], "%I:%M %p").hour
+
+def closeness(slot, want):
+    """How near a slot is to what the patient asked for (smaller is nearer)."""
+    day_gap = abs(DAYS[slot["date"]] - DAYS[want["day"]]) if want["day"] else 0
+    p = want["part"]
+    target = int(p.split(":")[1]) if p and p.startswith("hour:") else (CENTER_HOUR.get(p) if p else None)
+    return (day_gap, abs(slot_hour(slot) - target) if target is not None else 0)
+
 @app.post("/chat")
 def chat(data: ChatIn):
     text = data.message.lower()
     lang = detect_lang(data.message, data.lang)          # replies in the language the patient writes in
-    if any(w in text for w in EMERGENCY):                # urgent symptoms: do not book, send to real help
-        return {"reply": tr(lang, "emergency"), "ui": None, "lang": lang}
     want = understand(text)
-    if not (want["service"] or want["doctor"] or want["day"] or want["part"] or any(w in text for w in BOOKING_WORDS)):
+    english = ""
+    if not text.isascii() and not (want["service"] or want["doctor"] or want["day"] or want["part"]):
+        english = translate_text(data.message, "en", source="auto").lower()   # any other Indian language
+        want = understand(english)
+    full = text + " " + english
+    if any(w in full for w in EMERGENCY):                # urgent symptoms: do not book, send to real help
+        return {"reply": tr(lang, "emergency"), "ui": None, "lang": lang}
+    if not (want["service"] or want["doctor"] or want["day"] or want["part"] or any(w in full for w in BOOKING_WORDS)):
         return {"reply": tr(lang, "help"), "ui": None, "lang": lang}
 
     free = [s for s in SLOTS if slot_free(s)]
@@ -361,6 +482,8 @@ def chat(data: ChatIn):
             break
     if not found:
         return {"reply": tr(lang, "no_slots"), "ui": None, "lang": lang}
+    if note:                                             # no exact match: the 3 closest alternatives
+        found = sorted(found, key=lambda s: closeness(s, want))[:3]
     summary = svc_name(service, lang)
     if want["doctor"]: summary += " · " + doc_name(want["doctor"], lang)
     if want["day"]: summary += " · " + day_name(want["day"], lang)
@@ -409,11 +532,11 @@ def create_order(data: OrderIn):
     if not slot or slot["booked"]:
         return {"ok": False, "reply": tr(lang, "slot_taken")}
     if not holds_valid(data.slot_id, data.mobile):
-        return {"ok": False, "reply": tr(lang, "hold_expired")}
+        return {"ok": False, "expired": True, "reply": tr(lang, "hold_expired")}
     order_id = "ord_" + uuid.uuid4().hex[:8]
     ORDERS[order_id] = {"slot_id": data.slot_id, "name": data.name, "mobile": data.mobile,
                         "service": data.service, "status": "created"}
-    return {"ok": True, "order_id": order_id, "amount": AMOUNT, "hold_left": hold_left(data.slot_id),
+    return {"ok": True, "order_id": order_id, "amount": AMOUNT, "hold_left": hold_left(data.slot_id), "slot_id": data.slot_id, "service": data.service,
             "reply": tr(lang, "please_pay", amount=AMOUNT)}
 
 @app.post("/pay-demo")
@@ -433,11 +556,12 @@ def pay_demo(data: PayIn):
             left = hold_left(order["slot_id"])
             return {"ok": False, "retry": True, "hold_left": left,
                     "reply": tr(lang, "pay_fail_retry", left=f"{left // 60}:{left % 60:02d}")}
-        return {"ok": False, "reply": tr(lang, "pay_fail_expired")}
+        return {"ok": False, "expired": True, "reply": tr(lang, "pay_fail_expired")}
     if slot["booked"] or not holds_valid(order["slot_id"], order["mobile"]):
-        return {"ok": False, "reply": tr(lang, "hold_expired")}
+        return {"ok": False, "expired": True, "reply": tr(lang, "hold_expired")}
     slot["booked"] = True                                # booked ONLY after payment succeeds
     order["status"] = "paid"
+    order["start"] = appointment_start(slot)
     HOLDS.pop(order["slot_id"], None)
     VERIFIED.discard(order["mobile"])
     return {"ok": True, "order_id": data.order_id, "reply": tr(lang, "pay_ok"),
@@ -459,7 +583,7 @@ def calendar(order_id: str):
     if not order or order["status"] != "paid":
         return Response("Not found", status_code=404)
     slot = get_slot(order["slot_id"])
-    start = appointment_start(slot)
+    start = order_start(order)
     end = start + timedelta(minutes=30)
     f = "%Y%m%dT%H%M%S"
     ics = "\r\n".join([
@@ -487,13 +611,13 @@ def appointments(key: str = "", doctor: str = ""):
         if doctor and slot["doctor"] != doctor:
             continue
         counts[o["status"]] += 1
-        when = appointment_start(slot)
+        when = order_start(o)
         rows.append({"sort": when.isoformat(), "order_id": order_id, "patient": o["name"], "service": o["service"],
                      "doctor": slot["doctor"], "date": when.strftime("%a %d %b"), "time": slot["time"],
                      "mobile": "XXXXXX" + o["mobile"][-4:], "status": o["status"], "status_label": STATUS_LABEL[o["status"]]})
     rows.sort(key=lambda r: r["sort"])
     revenue = AMOUNT * (counts["paid"] + counts["completed"] + counts["no_show"])   # cancelled bookings are refunded
-    return {"ok": True, "doctors": sorted({s["doctor"] for s in SLOTS}), "appointments": rows,
+    return {"ok": True, "doctors": sorted({s["doctor"] for s in SLOTS}), "appointments": rows, "reminders": REMINDER_LOG[-15:][::-1],
             "summary": {"confirmed": counts["paid"], "completed": counts["completed"], "no_show": counts["no_show"],
                         "cancelled": counts["cancelled"], "revenue": revenue}}
 
@@ -506,3 +630,156 @@ def set_status(data: StatusIn):
         return {"ok": False, "reply": "Only confirmed appointments can be marked Completed or No-show."}
     order["status"] = data.status
     return {"ok": True}
+
+
+# ---------- all Indian languages ----------
+INDIAN_LANGS = [("en", "English"), ("hi", "हिन्दी"), ("kn", "ಕನ್ನಡ"), ("bn", "বাংলা"), ("te", "తెలుగు"), ("mr", "मराठी"),
+                ("ta", "தமிழ்"), ("ur", "اردو"), ("gu", "ગુજરાતી"), ("ml", "മലയാളം"), ("or", "ଓଡ଼ିଆ"), ("pa", "ਪੰਜਾਬੀ"),
+                ("as", "অসমীয়া"), ("mai", "मैथिली"), ("sa", "संस्कृतम्"), ("ne", "नेपाली"), ("sd", "سنڌي"),
+                ("gom", "कोंकणी"), ("doi", "डोगरी"), ("mni-mtei", "মৈতৈলোন্"), ("ks", "کٲشُر"), ("brx", "बड़ो"), ("sat", "ᱥᱟᱱᱛᱟᱲᱤ")]
+_supported = None
+
+def supported_codes():
+    """Languages the translation package supports (asked once, when the internet is reachable)."""
+    global _supported
+    if _supported is None:
+        codes = set(CURATED)
+        if GoogleTranslator is not None:
+            try:
+                got = GoogleTranslator(source="en", target="hi").get_supported_languages(as_dict=True)
+                _supported = codes | {c.lower() for c in got.values()}
+                return _supported
+            except Exception:
+                return codes
+        return codes
+    return _supported
+
+@app.get("/api/languages")
+def languages():
+    ok = supported_codes()
+    return {"languages": [{"code": c, "name": n} for c, n in INDIAN_LANGS if c in ok or c in CURATED]}
+
+@app.post("/api/translate")
+def translate_api(data: TranslateIn):
+    if data.lang not in {c for c, _ in INDIAN_LANGS} or len(data.texts) > 60:
+        return {"ok": False, "texts": data.texts}
+    return {"ok": True, "texts": [translate_template(str(t)[:300], data.lang) for t in data.texts]}
+
+# ---------- reschedule (payment carries over) ----------
+def free_slots_for(order, mobile):
+    doc = get_slot(order["slot_id"])["doctor"]
+    free = [s for s in SLOTS if s["id"] != order["slot_id"] and slot_free(s, mobile)]
+    free.sort(key=lambda s: (s["doctor"] != doc, DAYS[s["date"]], slot_hour(s)))
+    return free
+
+@app.post("/reschedule-options")
+def reschedule_options(data: ReschedOptIn):
+    lang = data.lang
+    order = ORDERS.get(data.order_id)
+    if not order or order["mobile"] != data.mobile or order["status"] != "paid":
+        return {"ok": False, "reply": tr(lang, "resched_no")}
+    free = free_slots_for(order, data.mobile)[:6]
+    if not free:
+        return {"ok": False, "reply": tr(lang, "resched_none")}
+    return {"ok": True, "reply": tr(lang, "resched_pick"), "slots": free}
+
+@app.post("/reschedule")
+def reschedule(data: ReschedIn):
+    lang = data.lang
+    order = ORDERS.get(data.order_id)
+    new = get_slot(data.slot_id)
+    if not order or order["mobile"] != data.mobile or order["status"] != "paid" or order.get("reschedules", 0) >= 2:
+        return {"ok": False, "reply": tr(lang, "resched_no")}
+    if not new or not slot_free(new, data.mobile):
+        return {"ok": False, "reply": tr(lang, "slot_gone")}
+    get_slot(order["slot_id"])["booked"] = False          # the old slot opens up for others
+    new["booked"] = True
+    order["slot_id"] = new["id"]
+    order["start"] = appointment_start(new)
+    order["reschedules"] = order.get("reschedules", 0) + 1
+    order["reminded"] = []                                # reminders are planned again for the new time
+    return {"ok": True, "reply": tr(lang, "resched_ok"), "details": booking_details(data.order_id, lang)}
+
+# ---------- smart slot recovery ----------
+@app.post("/recover")
+def recover(data: RecoverIn):
+    """After a hold ends without payment the slot is open again; offer the 3 nearest alternatives."""
+    lang = data.lang
+    gone = get_slot(data.slot_id)
+    free = [s for s in SLOTS if s["id"] != data.slot_id and slot_free(s)]
+    if gone:
+        free.sort(key=lambda s: (s["doctor"] != gone["doctor"], abs(DAYS[s["date"]] - DAYS[gone["date"]]), abs(slot_hour(s) - slot_hour(gone))))
+    if not free:
+        return {"ok": False, "reply": tr(lang, "no_slots")}
+    return {"ok": True, "reply": tr(lang, "recover_head"), "slots": free[:3], "service": data.service}
+
+# ---------- QR check-in pass ----------
+@app.get("/qr/{order_id}.svg")
+def qr_code(order_id: str, base: str = ""):
+    order = ORDERS.get(order_id)
+    if not order or order["status"] != "paid" or segno is None:
+        return Response("Not available", status_code=404)
+    url = (base if base.startswith("http") else "") + "/checkin/" + order_id
+    buf = io.BytesIO()
+    segno.make(url, error="m").save(buf, kind="svg", scale=5, border=2)
+    return Response(buf.getvalue(), media_type="image/svg+xml")
+
+@app.get("/checkin/{order_id}")
+def checkin(order_id: str):
+    """Opened when the QR code is scanned at reception. Shows only what the front desk needs (first name, no mobile)."""
+    o = ORDERS.get(order_id)
+    if not o or o["status"] not in ("paid", "completed"):
+        return HTMLResponse("<h3>Booking not found</h3>", status_code=404)
+    slot = get_slot(o["slot_id"])
+    when = order_start(o)
+    first = html.escape((o["name"].split() or [""])[0])
+    status = "Confirmed and paid" if o["status"] == "paid" else "Completed"
+    page = ("<html><head><meta name='viewport' content='width=device-width, initial-scale=1'></head>"
+            "<body style='font-family:sans-serif;max-width:420px;margin:30px auto'>"
+            "<h2>SmileCare check-in</h2>"
+            f"<p><b>Booking ID:</b> {html.escape(order_id)}</p><p><b>Patient:</b> {first}</p>"
+            f"<p><b>Service:</b> {html.escape(o['service'])}</p><p><b>Doctor:</b> {html.escape(slot['doctor'])}</p>"
+            f"<p><b>When:</b> {when.strftime('%a %d %b %Y')}, {slot['time']}</p>"
+            f"<p style='color:#15803d'><b>Status: {status}</b></p></body></html>")
+    return HTMLResponse(page)
+
+# ---------- automatic reminders (simulated: logged, not sent) ----------
+REMINDER_LOG = []
+REMINDER_OFFSETS = [("24 hours before", timedelta(hours=24)), ("2 hours before", timedelta(hours=2))]
+
+def send_reminder(order_id, kind):
+    """Real version: send a WhatsApp or SMS message here. In this prototype the reminder is only logged."""
+    o = ORDERS[order_id]
+    REMINDER_LOG.append({"time": datetime.now().strftime("%H:%M:%S"), "order_id": order_id, "patient": o["name"],
+                         "kind": kind, "channel": "WhatsApp/SMS (simulated)"})
+
+def run_reminders(force=False):
+    now, sent = datetime.now(), 0
+    for order_id, o in ORDERS.items():
+        if o["status"] != "paid":
+            continue
+        done = o.setdefault("reminded", [])
+        for kind, delta in REMINDER_OFFSETS:
+            if kind not in done and (force or now >= order_start(o) - delta):
+                send_reminder(order_id, kind)
+                done.append(kind)
+                sent += 1
+    return sent
+
+@app.post("/api/reminders/run")
+def reminders_run(data: KeyIn):
+    if data.key != DASHBOARD_KEY:
+        return {"ok": False, "reply": "Wrong or missing key."}
+    return {"ok": True, "sent": run_reminders(force=True)}      # demo button: send the reminders right now
+
+async def _reminder_loop():
+    while True:
+        try:
+            run_reminders()
+        except Exception:
+            pass
+        await asyncio.sleep(30)
+
+@app.on_event("startup")
+async def _start_reminders():
+    asyncio.create_task(_reminder_loop())

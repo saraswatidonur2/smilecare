@@ -23,6 +23,8 @@
   <input id="q" placeholder="Search patient name or booking ID">
   <span id="msg"></span>
   <div class="cards" id="cards"></div>
+  <h3>Reminders <button id="rem">Send reminders now (demo)</button></h3>
+  <div id="remlog" style="font-size:13px;color:#555"></div>
   <table>
     <thead><tr><th>Date</th><th>Time</th><th>Patient</th><th>Mobile</th><th>Doctor</th><th>Reason</th><th>Booking ID</th><th>Status</th><th>Action</th></tr></thead>
     <tbody id="rows"></tbody>
@@ -75,8 +77,14 @@ async function load() {
   cards.append(stat("Confirmed", s.confirmed), stat("Completed", s.completed), stat("No-show", s.no_show),
                stat("Cancelled", s.cancelled), stat("Revenue (\u20b9)", s.revenue));
   all = data.appointments; draw();
+  const log = document.getElementById("remlog"); log.innerHTML = "";
+  if (!data.reminders.length) log.textContent = "No reminders sent yet. They go out 24 hours and 2 hours before each appointment.";
+  data.reminders.forEach(r => { const p = document.createElement("div"); p.textContent = `${r.time}: ${r.kind} to ${r.patient} (${r.order_id}) via ${r.channel}`; log.appendChild(p); });
 }
 sel.onchange = load; q.oninput = draw;
+document.getElementById("rem").onclick = async () => {
+  await fetch("/api/reminders/run", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({key})}); load();
+};
 load(); setInterval(load, 5000);   // refreshes by itself every 5 seconds
 </script>
 </body>
