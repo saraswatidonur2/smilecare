@@ -1,4 +1,4 @@
-# STEP 8: all major Indian languages, reschedule, reminders, QR check-in pass, smart slot recovery (on top of Steps 1-7).
+# STEP 9: all specialties, symptom triage, patient memory, preparation instructions, post-visit follow-up (on top of Steps 1-8).
 # No AI key needed. English/Hindi/Kannada use hand-written text; other languages use the free deep-translator package.
 import asyncio, html, io, os, random, re, time, uuid
 from datetime import datetime, timedelta
@@ -20,6 +20,8 @@ DEMO_MODE = True        # OTP shown on screen; payment and refund are simulated
 DASHBOARD_KEY = os.environ.get("DASHBOARD_KEY", "demo123")
 HOLD_SECONDS = 300      # a slot is held for 5 minutes while the patient pays
 AMOUNT = 500            # consultation fee in rupees
+CLINIC_NAME = "SmileCare Clinic"      # shown on the calendar invite and the check-in page
+FOLLOWUP_DELAY = timedelta(hours=24)   # follow-up message goes out this long after the visit is marked Completed
 
 SLOTS = [
     {"id": 1, "doctor": "Dr. Rao",   "date": "Mon", "time": "10:00 AM", "booked": False},
@@ -31,7 +33,24 @@ SLOTS = [
     {"id": 7, "doctor": "Dr. Meena", "date": "Fri", "time": "04:30 PM", "booked": False},
     {"id": 8, "doctor": "Dr. Meena", "date": "Sat", "time": "09:30 AM", "booked": False},
     {"id": 9, "doctor": "Dr. Meena", "date": "Sat", "time": "05:30 PM", "booked": False},
+    {"id": 10, "doctor": "Dr. Iyer",     "date": "Mon", "time": "09:00 AM", "booked": False},
+    {"id": 11, "doctor": "Dr. Iyer",     "date": "Tue", "time": "06:00 PM", "booked": False},
+    {"id": 12, "doctor": "Dr. Iyer",     "date": "Sat", "time": "09:00 AM", "booked": False},
+    {"id": 13, "doctor": "Dr. Shah",     "date": "Wed", "time": "10:30 AM", "booked": False},
+    {"id": 14, "doctor": "Dr. Shah",     "date": "Sat", "time": "11:30 AM", "booked": False},
+    {"id": 15, "doctor": "Dr. Nair",     "date": "Tue", "time": "11:00 AM", "booked": False},
+    {"id": 16, "doctor": "Dr. Nair",     "date": "Thu", "time": "05:00 PM", "booked": False},
+    {"id": 17, "doctor": "Dr. Nair",     "date": "Sat", "time": "10:00 AM", "booked": False},
+    {"id": 18, "doctor": "Dr. Kulkarni", "date": "Mon", "time": "04:00 PM", "booked": False},
+    {"id": 19, "doctor": "Dr. Kulkarni", "date": "Fri", "time": "10:00 AM", "booked": False},
+    {"id": 20, "doctor": "Dr. Kulkarni", "date": "Sat", "time": "12:00 PM", "booked": False},
 ]
+# One line per doctor. To support another kind of treatment, add the doctor here, add slots above, and add the specialty below.
+DOCTOR_SPECIALTY = {"Dr. Rao": "Dental", "Dr. Meena": "Dental", "Dr. Iyer": "General Medicine",
+                    "Dr. Shah": "Dermatology", "Dr. Nair": "Cardiology", "Dr. Kulkarni": "Orthopedics"}
+for _s in SLOTS:
+    _s["specialty"] = DOCTOR_SPECIALTY[_s["doctor"]]
+PATIENTS = {}   # mobile -> {name, visits, last_service}: saved after the first paid booking, so we never ask twice
 OTPS = {}       # mobile -> {otp, expires, tries}
 VERIFIED = set()
 HOLDS = {}      # slot_id -> {mobile, expires}
@@ -78,6 +97,10 @@ class RecoverIn(BaseModel):
     slot_id: int
     service: str = "Dental visit"
     lang: str = "en"
+class FollowupIn(BaseModel):
+    order_id: str
+    answer: str          # better / same / worse
+    lang: str = "en"
 class KeyIn(BaseModel):
     key: str
 class StatusIn(BaseModel):
@@ -88,11 +111,11 @@ class StatusIn(BaseModel):
 # ---------- translations (Hindi and Kannada: please have a native speaker check them) ----------
 MSG = {
  "emergency": {
-  "en": "This sounds urgent. Please call the clinic directly or go to the nearest hospital now. I can't treat emergencies in this chat.",
-  "hi": "यह गंभीर लगता है। कृपया तुरंत क्लिनिक को फोन करें या नज़दीकी अस्पताल जाएँ। मैं इस चैट में आपातकालीन इलाज नहीं कर सकता।",
-  "kn": "ಇದು ತುರ್ತು ಎನಿಸುತ್ತದೆ. ದಯವಿಟ್ಟು ತಕ್ಷಣ ಕ್ಲಿನಿಕ್‌ಗೆ ಕರೆ ಮಾಡಿ ಅಥವಾ ಹತ್ತಿರದ ಆಸ್ಪತ್ರೆಗೆ ಹೋಗಿ. ಈ ಚಾಟ್‌ನಲ್ಲಿ ತುರ್ತು ಚಿಕಿತ್ಸೆ ನೀಡಲು ಸಾಧ್ಯವಿಲ್ಲ."},
+  "en": "This sounds urgent. Please call the clinic directly or go to the nearest hospital now. I can't treat emergencies in this chat. In India, dial 112.",
+  "hi": "यह गंभीर लगता है। कृपया तुरंत क्लिनिक को फोन करें या नज़दीकी अस्पताल जाएँ। मैं इस चैट में आपातकालीन इलाज नहीं कर सकता। भारत में 112 पर कॉल करें।",
+  "kn": "ಇದು ತುರ್ತು ಎನಿಸುತ್ತದೆ. ದಯವಿಟ್ಟು ತಕ್ಷಣ ಕ್ಲಿನಿಕ್‌ಗೆ ಕರೆ ಮಾಡಿ ಅಥವಾ ಹತ್ತಿರದ ಆಸ್ಪತ್ರೆಗೆ ಹೋಗಿ. ಈ ಚಾಟ್‌ನಲ್ಲಿ ತುರ್ತು ಚಿಕಿತ್ಸೆ ನೀಡಲು ಸಾಧ್ಯವಿಲ್ಲ. ಭಾರತದಲ್ಲಿ 112 ಗೆ ಕರೆ ಮಾಡಿ."},
  "help": {
-  "en": "I can book your dental visit. Try: cleaning with Dr. Rao on Saturday morning",
+  "en": "I can book a doctor visit for any kind of treatment. Tell me your symptoms or what you need, for example: fever and cough, any evening, or cleaning with Dr. Rao on Saturday morning",
   "hi": "मैं आपकी दंत चिकित्सा की अपॉइंटमेंट बुक कर सकता हूँ। कोशिश करें: शनिवार सुबह डॉ. राव के साथ सफाई",
   "kn": "ನಾನು ನಿಮ್ಮ ದಂತ ಭೇಟಿಯನ್ನು ಬುಕ್ ಮಾಡಬಲ್ಲೆ. ಹೀಗೆ ಬರೆಯಿರಿ: ಶನಿವಾರ ಬೆಳಿಗ್ಗೆ ಡಾ. ರಾವ್ ಅವರೊಂದಿಗೆ ಕ್ಲೀನಿಂಗ್"},
  "no_slots": {
@@ -211,6 +234,18 @@ MSG = {
   "en": "Your slot hold ended and the slot was released for other patients. Here are the nearest alternatives:",
   "hi": "आपका स्लॉट होल्ड समाप्त हो गया और स्लॉट दूसरे मरीज़ों के लिए खोल दिया गया। सबसे नज़दीकी विकल्प ये हैं:",
   "kn": "ನಿಮ್ಮ ಸ್ಲಾಟ್ ಕಾಯ್ದಿರಿಕೆ ಮುಗಿದು ಸ್ಲಾಟ್ ಇತರ ರೋಗಿಗಳಿಗೆ ಬಿಡುಗಡೆಯಾಗಿದೆ. ಹತ್ತಿರದ ಆಯ್ಕೆಗಳು ಇಲ್ಲಿವೆ:"},
+ "triage_note": {
+  "en": "I can't diagnose, but what you describe fits {specialty}. Here are the available doctors. The doctor will assess you properly at the visit."},
+ "ask_need": {
+  "en": "Tell me what is troubling you, or which kind of doctor you need ({specialties}), and your preferred day. I will show real slots."},
+ "welcome_back": {
+  "en": "Welcome back, {name}. I already have your details, so you do not need to enter them again."},
+ "fu_better": {
+  "en": "Glad you are feeling better! If anything changes, you can book again anytime."},
+ "fu_same": {
+  "en": "Sorry you are not better yet. A follow-up visit is a good idea, and you can book one now."},
+ "fu_worse": {
+  "en": "I am sorry you are feeling worse. Please call the clinic today, or go to the nearest hospital if it is severe. You can also book a follow-up now."},
 }
 DOC_NAMES = {"Dr. Rao": {"hi": "डॉ. राव", "kn": "ಡಾ. ರಾವ್"}, "Dr. Meena": {"hi": "डॉ. मीना", "kn": "ಡಾ. ಮೀನಾ"}}
 SERVICE_NAMES = {
@@ -342,7 +377,7 @@ def booking_details(order_id, lang="en"):
     slot = get_slot(o["slot_id"])
     return {"name": o["name"], "mobile": o["mobile"], "service": svc_name(o["service"], lang),
             "doctor": doc_name(slot["doctor"], lang), "date": fmt_date(order_start(o), lang),
-            "time": slot["time"], "amount": AMOUNT, "receipt": order_id}
+            "time": slot["time"], "amount": AMOUNT, "receipt": order_id, "prep": prep_text(o, lang)}
 
 # ---------- understanding free text (English, Hindi, Kannada; no AI key needed) ----------
 SERVICES = {
@@ -354,7 +389,8 @@ SERVICES = {
     "Braces consultation": ["brace", "aligner", "straighten", "ब्रेसेस", "ಬ್ರೇಸ್"],
     "Whitening": ["whiten", "सफेदी", "व्हाइटनिंग", "ವೈಟ್ನಿಂಗ್"],
 }
-EMERGENCY = ["severe pain", "bleeding", "swelling", "swollen", "emergency", "accident", "knocked out", "can't breathe", "unbearable",
+EMERGENCY = ["severe pain", "bleeding", "swelling", "swollen", "emergency", "accident", "knocked out", "can't breathe", "unbearable", "chest pain", "difficulty breathing", "shortness of breath",
+             "unconscious", "seizure", "fainted", "overdose",
              "तेज दर्द", "बहुत दर्द", "खून", "सूजन", "आपातकाल", "इमरजेंसी", "ತೀವ್ರ ನೋವು", "ತುಂಬಾ ನೋವು", "ರಕ್ತ", "ಊತ", "ತುರ್ತು"]
 BOOKING_WORDS = ["book", "appointment", "slot", "schedule", "visit", "see ", "बुक", "अपॉइंटमेंट", "स्लॉट", "ಬುಕ್", "ಅಪಾಯಿಂಟ್", "ಸ್ಲಾಟ್"]
 LOCAL_DOCS = {"राव": "Dr. Rao", "ರಾವ್": "Dr. Rao", "मीना": "Dr. Meena", "ಮೀನಾ": "Dr. Meena"}
@@ -419,6 +455,42 @@ def matches(slot, doctor, day, part):
         elif part_of(slot) != part: return False
     return True
 
+# ---------- specialties: words that point to each one, and what to tell the patient before the visit ----------
+SPECIALTIES = {
+    "Dental": {
+        "words": ["tooth", "teeth", "gum", "dental", "dentist", "cavity", "cavities", "jaw", "wisdom", "braces", "root canal",
+                  "cleaning", "scaling", "whiten"],
+        "prep": "Brush and floss before you come, bring any earlier dental X-rays, and tell the dentist about your medicines and allergies."},
+    "General Medicine": {
+        "words": ["fever", "cold", "cough", "flu", "headache", "migraine", "body ache", "fatigue", "tired", "weakness", "stomach",
+                  "vomit", "nausea", "diarrhea", "diarrhoea", "sore throat", "infection", "diabetes", "sugar", "thyroid", "physician"],
+        "prep": "Note down when your symptoms started and what makes them better or worse. Bring earlier prescriptions or reports and a list of your medicines. If the clinic mentions a blood test, ask whether you need to fast."},
+    "Dermatology": {
+        "words": ["skin", "rash", "itch", "acne", "pimple", "hair fall", "hair loss", "dandruff", "eczema", "fungal", "wart", "dermat"],
+        "prep": "Do not put creams or makeup on the affected area before the visit. Bring the products you currently use, and a photo of how it looked earlier if it has changed."},
+    "Cardiology": {
+        "words": ["heart", "palpitation", "blood pressure", "hypertension", "cholesterol", "cardio", "ecg"],
+        "prep": "Bring earlier ECG or other heart reports and a list of all your medicines. Wear comfortable clothes. Ask the clinic if any test needs fasting."},
+    "Orthopedics": {
+        "words": ["bone", "joint", "knee", "back pain", "neck pain", "shoulder", "fracture", "sprain", "ortho", "arthritis", "spine", "ankle", "muscle"],
+        "prep": "Wear loose clothing so the doctor can see the area. Bring any X-rays, MRI films or reports. Avoid heavy strain on the painful area that day."},
+}
+
+def find_specialty(text):
+    """The specialty whose words appear most often in the patient's message (None if no symptom words)."""
+    best, top = None, 0
+    for name, info in SPECIALTIES.items():
+        score = sum(1 for w in info["words"] if w in text)
+        if score > top:
+            best, top = name, score
+    return best
+
+def prep_text(o, lang="en"):
+    info = SPECIALTIES.get(get_slot(o["slot_id"])["specialty"], {})
+    text = ("Before your visit: " + info.get("prep", "Bring any earlier reports and a list of your medicines.")
+            + " Please arrive 10 minutes early and bring a photo ID.")
+    return text if lang == "en" else translate_text(text, lang)
+
 def understand(text):
     return {"service": find_service(text), "doctor": find_doctor(text),
             "day": find_day(text), "part": find_part_of_day(text)}
@@ -463,11 +535,22 @@ def chat(data: ChatIn):
     full = text + " " + english
     if any(w in full for w in EMERGENCY):                # urgent symptoms: do not book, send to real help
         return {"reply": tr(lang, "emergency"), "ui": None, "lang": lang}
-    if not (want["service"] or want["doctor"] or want["day"] or want["part"] or any(w in full for w in BOOKING_WORDS)):
+    symptom_spec = find_specialty(full)
+    if want["doctor"]:
+        spec = DOCTOR_SPECIALTY[want["doctor"]]
+    else:
+        spec = symptom_spec or ("Dental" if want["service"] else None)
+    all_specs = sorted({s["specialty"] for s in SLOTS})
+    if spec is None and len(all_specs) == 1:                # a single-specialty clinic needs no question
+        spec = all_specs[0]
+    if not (want["service"] or want["doctor"] or want["day"] or want["part"] or spec or any(w in full for w in BOOKING_WORDS)):
         return {"reply": tr(lang, "help"), "ui": None, "lang": lang}
+    if spec is None:                                        # wants to book, but we cannot tell with whom
+        return {"reply": tr(lang, "ask_need", specialties=", ".join(all_specs)), "ui": None, "lang": lang}
 
-    free = [s for s in SLOTS if slot_free(s)]
-    service = want["service"] or "Dental visit"
+    free = [s for s in SLOTS if slot_free(s) and s["specialty"] == spec]
+    service = (want["service"] or "Dental visit") if spec == "Dental" else spec + " consultation"
+    triage = bool(symptom_spec) and not want["doctor"] and not want["service"] and symptom_spec == spec
     tries = [                                            # exact match first, then relax one condition at a time
         (want["doctor"], want["day"], want["part"], None),
         (want["doctor"], want["day"], None, "note_time"),
@@ -488,7 +571,8 @@ def chat(data: ChatIn):
     if want["doctor"]: summary += " · " + doc_name(want["doctor"], lang)
     if want["day"]: summary += " · " + day_name(want["day"], lang)
     if want["part"] and not want["part"].startswith("hour:"): summary += " · " + part_name(want["part"], lang)
-    reply = (tr(lang, note) + " " if note else "") + tr(lang, "slots_head", summary=summary)
+    reply = (tr(lang, "triage_note", specialty=spec) + " " if triage else "") \
+            + (tr(lang, note) + " " if note else "") + tr(lang, "slots_head", summary=summary)
     return {"reply": reply, "lang": lang, "ui": {"type": "slots", "slots": found[:6], "service": service}}
 
 @app.post("/send-otp")
@@ -521,7 +605,9 @@ def verify_otp(data: VerifyIn):
         return {"ok": False, "reply": tr(lang, "otp_wrong")}
     VERIFIED.add(data.mobile)
     OTPS.pop(data.mobile, None)
-    return {"ok": True, "reply": tr(lang, "otp_ok")}
+    known = PATIENTS.get(data.mobile)                     # returning patient: the page can pre-fill the name
+    reply = tr(lang, "otp_ok") + ((" " + tr(lang, "welcome_back", name=known["name"])) if known else "")
+    return {"ok": True, "reply": reply, "patient": known}
 
 @app.post("/create-order")
 def create_order(data: OrderIn):
@@ -564,7 +650,10 @@ def pay_demo(data: PayIn):
     order["start"] = appointment_start(slot)
     HOLDS.pop(order["slot_id"], None)
     VERIFIED.discard(order["mobile"])
-    return {"ok": True, "order_id": data.order_id, "reply": tr(lang, "pay_ok"),
+    prev = PATIENTS.get(order["mobile"], {})
+    PATIENTS[order["mobile"]] = {"name": order["name"], "visits": prev.get("visits", 0) + 1, "last_service": order["service"]}
+    send_reminder(data.order_id, "Preparation instructions", prep_text(order, "en"))      # simulated, like the other reminders
+    return {"ok": True, "order_id": data.order_id, "reply": tr(lang, "pay_ok") + " " + prep_text(order, lang),
             "details": booking_details(data.order_id, lang)}
 
 @app.post("/cancel")
@@ -590,7 +679,7 @@ def calendar(order_id: str):
         "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//SmileCare//EN", "BEGIN:VEVENT",
         f"UID:{order_id}@smilecare", f"DTSTAMP:{datetime.utcnow().strftime(f)}Z",
         f"DTSTART:{start.strftime(f)}", f"DTEND:{end.strftime(f)}",
-        f"SUMMARY:{order['service']} with {slot['doctor']}", "LOCATION:SmileCare Dental Clinic",
+        f"SUMMARY:{order['service']} with {slot['doctor']}", f"LOCATION:{CLINIC_NAME}",
         "END:VEVENT", "END:VCALENDAR", ""])
     return Response(ics, media_type="text/calendar",
                     headers={"Content-Disposition": 'attachment; filename="appointment.ics"'})
@@ -614,7 +703,8 @@ def appointments(key: str = "", doctor: str = ""):
         when = order_start(o)
         rows.append({"sort": when.isoformat(), "order_id": order_id, "patient": o["name"], "service": o["service"],
                      "doctor": slot["doctor"], "date": when.strftime("%a %d %b"), "time": slot["time"],
-                     "mobile": "XXXXXX" + o["mobile"][-4:], "status": o["status"], "status_label": STATUS_LABEL[o["status"]]})
+                     "mobile": "XXXXXX" + o["mobile"][-4:], "status": o["status"], "status_label": STATUS_LABEL[o["status"]],
+                     "followup": o.get("followup_answer", "")})
     rows.sort(key=lambda r: r["sort"])
     revenue = AMOUNT * (counts["paid"] + counts["completed"] + counts["no_show"])   # cancelled bookings are refunded
     return {"ok": True, "doctors": sorted({s["doctor"] for s in SLOTS}), "appointments": rows, "reminders": REMINDER_LOG[-15:][::-1],
@@ -629,6 +719,8 @@ def set_status(data: StatusIn):
     if not order or order["status"] != "paid" or data.status not in ("completed", "no_show"):
         return {"ok": False, "reply": "Only confirmed appointments can be marked Completed or No-show."}
     order["status"] = data.status
+    if data.status == "completed":
+        order["completed_at"] = datetime.now()               # the follow-up message is planned from this moment
     return {"ok": True}
 
 
@@ -668,7 +760,8 @@ def translate_api(data: TranslateIn):
 # ---------- reschedule (payment carries over) ----------
 def free_slots_for(order, mobile):
     doc = get_slot(order["slot_id"])["doctor"]
-    free = [s for s in SLOTS if s["id"] != order["slot_id"] and slot_free(s, mobile)]
+    free = [s for s in SLOTS if s["id"] != order["slot_id"] and slot_free(s, mobile)
+            and s["specialty"] == get_slot(order["slot_id"])["specialty"]]
     free.sort(key=lambda s: (s["doctor"] != doc, DAYS[s["date"]], slot_hour(s)))
     return free
 
@@ -706,7 +799,7 @@ def recover(data: RecoverIn):
     """After a hold ends without payment the slot is open again; offer the 3 nearest alternatives."""
     lang = data.lang
     gone = get_slot(data.slot_id)
-    free = [s for s in SLOTS if s["id"] != data.slot_id and slot_free(s)]
+    free = [s for s in SLOTS if s["id"] != data.slot_id and slot_free(s) and (not gone or s["specialty"] == gone["specialty"])]
     if gone:
         free.sort(key=lambda s: (s["doctor"] != gone["doctor"], abs(DAYS[s["date"]] - DAYS[gone["date"]]), abs(slot_hour(s) - slot_hour(gone))))
     if not free:
@@ -736,7 +829,7 @@ def checkin(order_id: str):
     status = "Confirmed and paid" if o["status"] == "paid" else "Completed"
     page = ("<html><head><meta name='viewport' content='width=device-width, initial-scale=1'></head>"
             "<body style='font-family:sans-serif;max-width:420px;margin:30px auto'>"
-            "<h2>SmileCare check-in</h2>"
+            f"<h2>{html.escape(CLINIC_NAME)} check-in</h2>"
             f"<p><b>Booking ID:</b> {html.escape(order_id)}</p><p><b>Patient:</b> {first}</p>"
             f"<p><b>Service:</b> {html.escape(o['service'])}</p><p><b>Doctor:</b> {html.escape(slot['doctor'])}</p>"
             f"<p><b>When:</b> {when.strftime('%a %d %b %Y')}, {slot['time']}</p>"
@@ -747,11 +840,11 @@ def checkin(order_id: str):
 REMINDER_LOG = []
 REMINDER_OFFSETS = [("24 hours before", timedelta(hours=24)), ("2 hours before", timedelta(hours=2))]
 
-def send_reminder(order_id, kind):
+def send_reminder(order_id, kind, text=""):
     """Real version: send a WhatsApp or SMS message here. In this prototype the reminder is only logged."""
     o = ORDERS[order_id]
     REMINDER_LOG.append({"time": datetime.now().strftime("%H:%M:%S"), "order_id": order_id, "patient": o["name"],
-                         "kind": kind, "channel": "WhatsApp/SMS (simulated)"})
+                         "kind": kind, "text": text, "channel": "WhatsApp/SMS (simulated)"})
 
 def run_reminders(force=False):
     now, sent = datetime.now(), 0
@@ -764,6 +857,13 @@ def run_reminders(force=False):
                 send_reminder(order_id, kind)
                 done.append(kind)
                 sent += 1
+    for order_id, o in ORDERS.items():                         # post-visit follow-up for completed visits
+        if o["status"] == "completed" and not o.get("followup_sent") and (force or now >= o.get("completed_at", now) + FOLLOWUP_DELAY):
+            first = (o["name"].split() or [""])[0]
+            send_reminder(order_id, "Post-visit follow-up",
+                          f"Hi {first}, how are you feeling after your visit? Tap to tell us: /followup/{order_id}")
+            o["followup_sent"] = True
+            sent += 1
     return sent
 
 @app.post("/api/reminders/run")
@@ -783,3 +883,35 @@ async def _reminder_loop():
 @app.on_event("startup")
 async def _start_reminders():
     asyncio.create_task(_reminder_loop())
+
+
+# ---------- post-visit follow-up (the link inside the follow-up message opens this page) ----------
+@app.get("/followup/{order_id}")
+def followup_page(order_id: str, lang: str = "en"):
+    o = ORDERS.get(order_id)
+    if not o or o["status"] != "completed":
+        return HTMLResponse("<h3>Link not available</h3>", status_code=404)
+    lang = re.sub(r"[^a-z-]", "", lang.lower())[:10] or "en"
+    first = html.escape((o["name"].split() or [""])[0])
+    page = ("<html><head><meta name='viewport' content='width=device-width, initial-scale=1'></head>"
+            "<body style='font-family:sans-serif;max-width:420px;margin:30px auto;padding:0 12px'>"
+            f"<h2>{html.escape(CLINIC_NAME)}</h2><p>Hi {first}, how are you feeling after your visit?</p>"
+            "<button style='padding:12px;margin:4px' onclick=\"send('better')\">Better</button>"
+            "<button style='padding:12px;margin:4px' onclick=\"send('same')\">Same</button>"
+            "<button style='padding:12px;margin:4px' onclick=\"send('worse')\">Worse</button>"
+            "<p id='out' style='margin-top:16px'></p>"
+            "<p id='book' style='display:none'><a href='/'>Book a follow-up visit</a></p>"
+            "<script>function send(a){fetch('/followup-reply',{method:'POST',headers:{'Content-Type':'application/json'},"
+            "body:JSON.stringify({order_id:'__ID__',answer:a,lang:'__LANG__'})}).then(function(r){return r.json()}).then(function(d){"
+            "document.getElementById('out').textContent=d.reply;"
+            "if(d.rebook){document.getElementById('book').style.display='block';}});}</script></body></html>")
+    return HTMLResponse(page.replace("__ID__", html.escape(order_id)).replace("__LANG__", lang))
+
+@app.post("/followup-reply")
+def followup_reply(data: FollowupIn):
+    lang = data.lang
+    o = ORDERS.get(data.order_id)
+    if not o or o["status"] != "completed" or data.answer not in ("better", "same", "worse"):
+        return {"ok": False, "reply": tr(lang, "cancel_no")}
+    o["followup_answer"] = data.answer                       # the doctor sees this on the dashboard
+    return {"ok": True, "rebook": data.answer != "better", "reply": tr(lang, "fu_" + data.answer)}
