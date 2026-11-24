@@ -22,7 +22,8 @@
     .ok h4{margin:0 0 8px;color:#15803d}
     .ok div{margin:3px 0;font-size:14px}
     .ok .note{color:#555;font-size:12px;margin-top:6px}
-    .ok img{display:block;margin:8px 0}
+    .ok .prep{background:#fff;border:1px dashed #16a34a;border-radius:6px;padding:8px;margin-top:8px;font-size:13px}
+    .ok img{width:140px;height:140px;display:block;margin-top:8px}
   </style>
 </head>
 <body>
@@ -41,56 +42,46 @@
   <button id="sendBtn" onclick="send()"></button>
 
 <script>
-// ---------- translations (Hindi and Kannada: have a native speaker check them) ----------
+// ---------- screen text (Hindi and Kannada: have a native speaker check them; other languages are translated by the server) ----------
 const UI = {
-  en: {used:"Messages used", ph:"e.g. cleaning with Dr. Rao on Saturday morning", send:"Send",
+  en: {used:"Messages used", ph:"e.g. fever and cough, or cleaning with Dr. Rao on Saturday morning", send:"Send",
        mobile:"Enter your mobile number", mobile_ph:"10-digit mobile", otp:"Enter the 6-digit OTP", otp_ph:"OTP",
        name:"Your name", name_ph:"Full name", pay:"Pay \u20b9{0}", held:"Your slot is held for you: ",
-       hold_gone:"Your 5-minute slot hold has expired. Please start again.",
+       hold_gone:"Your 5-minute slot hold has expired.",
        l_name:"Name", l_mobile:"Mobile", l_service:"Service", l_doctor:"Doctor", l_date:"Date", l_time:"Time", l_paid:"Paid", l_id:"Booking ID",
-       cal:"Add to calendar", cancel:"Cancel appointment", cancel_q:"Cancel this appointment?", resched:"Reschedule", qr:"Show this QR code at the clinic reception",
+       cal:"Add to calendar", cancel:"Cancel appointment", cancel_q:"Cancel this appointment?", resched:"Reschedule",
+       qr_note:"Show this QR code at the clinic reception",
        remind:"Reminders: 24 hours and 2 hours before (WhatsApp/SMS in the live version)"},
-  hi: {used:"उपयोग किए गए संदेश", ph:"जैसे: शनिवार सुबह डॉ. राव के साथ सफाई", send:"भेजें",
+  hi: {used:"उपयोग किए गए संदेश", ph:"जैसे: बुखार और खांसी, या शनिवार सुबह डॉ. राव के साथ सफाई", send:"भेजें",
        mobile:"अपना मोबाइल नंबर दर्ज करें", mobile_ph:"10 अंकों का मोबाइल", otp:"6 अंकों का OTP दर्ज करें", otp_ph:"OTP",
        name:"आपका नाम", name_ph:"पूरा नाम", pay:"\u20b9{0} का भुगतान करें", held:"आपका स्लॉट आपके लिए रोका गया है: ",
-       hold_gone:"आपका 5 मिनट का स्लॉट होल्ड समाप्त हो गया। कृपया फिर से शुरू करें।",
+       hold_gone:"आपका 5 मिनट का स्लॉट होल्ड समाप्त हो गया।",
        l_name:"नाम", l_mobile:"मोबाइल", l_service:"सेवा", l_doctor:"डॉक्टर", l_date:"तारीख", l_time:"समय", l_paid:"भुगतान", l_id:"बुकिंग आईडी",
-       cal:"कैलेंडर में जोड़ें", cancel:"अपॉइंटमेंट रद्द करें", cancel_q:"क्या यह अपॉइंटमेंट रद्द करें?", resched:"समय बदलें", qr:"क्लिनिक रिसेप्शन पर यह QR कोड दिखाएँ",
+       cal:"कैलेंडर में जोड़ें", cancel:"अपॉइंटमेंट रद्द करें", cancel_q:"क्या यह अपॉइंटमेंट रद्द करें?", resched:"समय बदलें",
+       qr_note:"यह QR कोड क्लिनिक रिसेप्शन पर दिखाएँ",
        remind:"रिमाइंडर: 24 घंटे और 2 घंटे पहले (लाइव संस्करण में WhatsApp/SMS)"},
-  kn: {used:"ಬಳಸಿದ ಸಂದೇಶಗಳು", ph:"ಉದಾ: ಶನಿವಾರ ಬೆಳಿಗ್ಗೆ ಡಾ. ರಾವ್ ಅವರೊಂದಿಗೆ ಕ್ಲೀನಿಂಗ್", send:"ಕಳುಹಿಸಿ",
+  kn: {used:"ಬಳಸಿದ ಸಂದೇಶಗಳು", ph:"ಉದಾ: ಜ್ವರ ಮತ್ತು ಕೆಮ್ಮು, ಅಥವಾ ಶನಿವಾರ ಬೆಳಿಗ್ಗೆ ಡಾ. ರಾವ್ ಅವರೊಂದಿಗೆ ಕ್ಲೀನಿಂಗ್", send:"ಕಳುಹಿಸಿ",
        mobile:"ನಿಮ್ಮ ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ನಮೂದಿಸಿ", mobile_ph:"10 ಅಂಕಿಯ ಮೊಬೈಲ್", otp:"6 ಅಂಕಿಯ OTP ನಮೂದಿಸಿ", otp_ph:"OTP",
        name:"ನಿಮ್ಮ ಹೆಸರು", name_ph:"ಪೂರ್ಣ ಹೆಸರು", pay:"\u20b9{0} ಪಾವತಿಸಿ", held:"ನಿಮ್ಮ ಸ್ಲಾಟ್ ನಿಮಗಾಗಿ ಕಾಯ್ದಿರಿಸಲಾಗಿದೆ: ",
-       hold_gone:"ನಿಮ್ಮ 5 ನಿಮಿಷಗಳ ಸ್ಲಾಟ್ ಕಾಯ್ದಿರಿಕೆ ಮುಗಿದಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಾರಂಭಿಸಿ.",
+       hold_gone:"ನಿಮ್ಮ 5 ನಿಮಿಷಗಳ ಸ್ಲಾಟ್ ಕಾಯ್ದಿರಿಕೆ ಮುಗಿದಿದೆ.",
        l_name:"ಹೆಸರು", l_mobile:"ಮೊಬೈಲ್", l_service:"ಸೇವೆ", l_doctor:"ವೈದ್ಯರು", l_date:"ದಿನಾಂಕ", l_time:"ಸಮಯ", l_paid:"ಪಾವತಿ", l_id:"ಬುಕಿಂಗ್ ಐಡಿ",
-       cal:"ಕ್ಯಾಲೆಂಡರ್‌ಗೆ ಸೇರಿಸಿ", cancel:"ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ರದ್ದುಮಾಡಿ", cancel_q:"ಈ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ರದ್ದುಮಾಡಬೇಕೇ?", resched:"ಸಮಯ ಬದಲಿಸಿ", qr:"ಕ್ಲಿನಿಕ್ ರಿಸೆಪ್ಷನ್‌ನಲ್ಲಿ ಈ QR ಕೋಡ್ ತೋರಿಸಿ",
+       cal:"ಕ್ಯಾಲೆಂಡರ್‌ಗೆ ಸೇರಿಸಿ", cancel:"ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ರದ್ದುಮಾಡಿ", cancel_q:"ಈ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ರದ್ದುಮಾಡಬೇಕೇ?", resched:"ಸಮಯ ಬದಲಿಸಿ",
+       qr_note:"ಈ QR ಕೋಡ್ ಅನ್ನು ಕ್ಲಿನಿಕ್ ಸ್ವಾಗತದಲ್ಲಿ ತೋರಿಸಿ",
        remind:"ಜ್ಞಾಪನೆಗಳು: 24 ಗಂಟೆ ಮತ್ತು 2 ಗಂಟೆ ಮೊದಲು (ಲೈವ್ ಆವೃತ್ತಿಯಲ್ಲಿ WhatsApp/SMS)"}
 };
 const DOC = {"Dr. Rao": {hi:"डॉ. राव", kn:"ಡಾ. ರಾವ್"}, "Dr. Meena": {hi:"डॉ. मीना", kn:"ಡಾ. ಮೀನಾ"}};
 const DAYS = {hi: {Mon:"सोमवार",Tue:"मंगलवार",Wed:"बुधवार",Thu:"गुरुवार",Fri:"शुक्रवार",Sat:"शनिवार",Sun:"रविवार"},
               kn: {Mon:"ಸೋಮವಾರ",Tue:"ಮಂಗಳವಾರ",Wed:"ಬುಧವಾರ",Thu:"ಗುರುವಾರ",Fri:"ಶುಕ್ರವಾರ",Sat:"ಶನಿವಾರ",Sun:"ಭಾನುವಾರ"}};
+const SPEECH = {en:"en-IN",hi:"hi-IN",kn:"kn-IN",bn:"bn-IN",te:"te-IN",mr:"mr-IN",ta:"ta-IN",ur:"ur-IN",gu:"gu-IN",ml:"ml-IN",or:"or-IN",pa:"pa-IN",as:"as-IN",ne:"ne-NP"};
+const BASE_KEYS = Object.keys(UI.en);
+const tCache = {};      // screen text for languages translated by the server
 let lang = "en";
-const DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const FULL_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const VOICE = {en:"en-IN", hi:"hi-IN", kn:"kn-IN", bn:"bn-IN", te:"te-IN", mr:"mr-IN", ta:"ta-IN", ur:"ur-IN", gu:"gu-IN",
-               ml:"ml-IN", pa:"pa-IN", or:"or-IN", ne:"ne-NP", as:"as-IN"};
-
-// Languages other than English/Hindi/Kannada: the server translates the screen text once, then it is reused
-async function ensureLang(code) {
-  if (UI[code]) return;
-  const keys = Object.keys(UI.en);
-  const texts = keys.map(k => UI.en[k]).concat(FULL_DAYS);
-  try {
-    const res = await fetch("/api/translate", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({lang: code, texts})});
-    const data = await res.json();
-    if (data.ok) {
-      UI[code] = {}; keys.forEach((k, i) => { UI[code][k] = data.texts[i]; });
-      DAYS[code] = {}; DAY_KEYS.forEach((d, i) => { DAYS[code][d] = data.texts[keys.length + i]; });
-      return;
-    }
-  } catch (e) {}
-  UI[code] = {...UI.en};   // translation service unavailable: stay readable in English
-}
-const t = (k, ...a) => { let s = (UI[lang] && UI[lang][k]) || UI.en[k]; a.forEach((v, i) => { s = s.replace("{" + i + "}", v); }); return s; };
+const t = (k, ...a) => {
+  const table = UI[lang] || tCache[lang] || {};
+  let s = table[k] || UI.en[k];
+  a.forEach((v, i) => { s = s.replace("{" + i + "}", v); });
+  return s;
+};
 const docName = d => (DOC[d] && DOC[d][lang]) || d;
 const dayName = d => (DAYS[lang] && DAYS[lang][d]) || d;
 
@@ -101,6 +92,7 @@ if (params.get("color")) document.documentElement.style.setProperty("--brand", p
 if (params.get("clinic")) document.getElementById("title").textContent = params.get("clinic") + " Booking";
 
 const chat = document.getElementById("chat");
+const langSel = document.getElementById("lang");
 let used = 0;
 let journeyDone = false;   // after a finished booking, the next request starts a fresh count
 
@@ -108,14 +100,32 @@ function applyLang() {
   document.getElementById("msg").placeholder = t("ph");
   document.getElementById("sendBtn").textContent = t("send");
   document.getElementById("usedLbl").textContent = t("used");
-  document.getElementById("lang").value = lang;
+  langSel.value = lang;
 }
-document.getElementById("lang").onchange = async e => { const code = e.target.value; await ensureLang(code); lang = code; applyLang(); };
-fetch("/api/languages").then(r => r.json()).then(d => {      // the dropdown lists every language the server can use
-  const sel = document.getElementById("lang"); sel.innerHTML = "";
-  d.languages.forEach(l => { const o = document.createElement("option"); o.value = l.code; o.textContent = l.name; sel.appendChild(o); });
-  sel.value = lang;
-}).catch(() => {});
+// Switching language: hi/kn use the text above; every other language is translated once by the server.
+async function setLang(code) {
+  lang = code;
+  if (!UI[code] && !tCache[code]) {
+    try {
+      const r = await fetch("/api/translate", {method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({lang: code, texts: BASE_KEYS.map(k => UI.en[k])})}).then(x => x.json());
+      if (r.ok) { const o = {}; BASE_KEYS.forEach((k, i) => { o[k] = r.texts[i]; }); tCache[code] = o; }
+    } catch (e) { /* stay in English if the translation service is unreachable */ }
+  }
+  applyLang();
+}
+langSel.onchange = e => setLang(e.target.value);
+// Fill the language list from the server (all Indian languages it supports)
+(async function loadLangs() {
+  try {
+    const r = await fetch("/api/languages").then(x => x.json());
+    if (r.languages && r.languages.length) {
+      langSel.innerHTML = "";
+      r.languages.forEach(l => { const o = document.createElement("option"); o.value = l.code; o.textContent = l.name; langSel.appendChild(o); });
+      langSel.value = lang;
+    }
+  } catch (e) { /* keep the three built-in options */ }
+})();
 
 const scroll = () => { chat.scrollTop = chat.scrollHeight; };
 function add(text, cls) {
@@ -142,6 +152,7 @@ function ask(label, placeholder, counts = true) {
       const v = inp.value.trim(); if (!v) return;
       wrap.remove(); add(v, "me"); if (counts) count(); resolve(v);
     };
+    inp.addEventListener("keydown", e => { if (e.key === "Enter") btn.onclick(); });
     wrap.append(inp, btn); chat.appendChild(wrap); inp.focus(); scroll();
   });
 }
@@ -151,8 +162,9 @@ async function send() {
   const message = box.value.trim(); if (!message) return;
   if (journeyDone) { resetCount(); journeyDone = false; }
   add(message, "me"); count(); box.value = "";
-  const data = await post("/chat", {message});
-  if (data.lang && data.lang !== lang) { await ensureLang(data.lang); lang = data.lang; applyLang(); }   // follows the language the patient writes in
+  let data;
+  try { data = await post("/chat", {message}); } catch (e) { add("Connection problem. Please try again.", "bot"); return; }
+  if (data.lang && data.lang !== lang) await setLang(data.lang);   // follows the language the patient writes in
   add(data.reply, "bot");
   if (data.ui && data.ui.type === "slots") showSlots(data.ui.slots, data.ui.service);
 }
@@ -161,42 +173,44 @@ function showSlots(slots, service) {
   const wrap = document.createElement("div");
   slots.forEach(s => {
     const b = document.createElement("button");
-    b.textContent = `${docName(s.doctor)} \u00b7 ${dayName(s.date)} ${s.time}`;
+    b.textContent = `${docName(s.doctor)}${s.specialty ? " (" + s.specialty + ")" : ""} \u00b7 ${dayName(s.date)} ${s.time}`;
     b.onclick = () => { wrap.remove(); book(s.id, service); };
     wrap.appendChild(b);
   });
   chat.appendChild(wrap); scroll();
 }
 
-// Smart slot recovery: when a hold ends without payment, offer the nearest alternatives
-async function recover(slot_id, service) {
-  const r = await post("/recover", {slot_id, service});
-  add(r.reply, "bot");
-  if (r.ok) showSlots(r.slots, service);
-}
-
-// Booking flow: mobile -> OTP -> name -> pay -> confirmed
+// Booking flow: mobile -> OTP -> (name, only if new) -> pay -> confirmed
 async function book(slot_id, service) {
   const mobile = await ask(t("mobile"), t("mobile_ph"));
   const o = await post("/send-otp", {slot_id, mobile});
   add(o.reply, "bot");
   if (!o.ok) { journeyDone = true; return; }
 
-  let verified = false;
+  let verified = false, known = null;
   for (let i = 0; i < 3 && !verified; i++) {
     const otp = await ask(t("otp"), t("otp_ph"), i === 0);
     const v = await post("/verify-otp", {mobile, otp});
     add(v.reply, "bot");
     verified = v.ok;
+    if (v.ok) known = v.patient;
     if (!v.ok && v.restart) { journeyDone = true; return; }
   }
   if (!verified) { journeyDone = true; return; }
 
-  const name = await ask(t("name"), t("name_ph"));
+  // returning patients are never asked for their name again
+  const name = (known && known.name) || await ask(t("name"), t("name_ph"));
   const c = await post("/create-order", {slot_id, name, mobile, service});
   add(c.reply, "bot");
-  if (!c.ok) { journeyDone = true; if (c.expired) recover(slot_id, service); return; }
+  if (!c.ok) { journeyDone = true; return; }
   showPayment(c);
+}
+
+// When a hold ends without payment, offer the nearest free slots instead of a dead end
+async function recover(c) {
+  const r = await post("/recover", {slot_id: c.slot_id, service: c.service});
+  if (r.reply) add(r.reply, "bot");
+  if (r.ok && r.slots) showSlots(r.slots, r.service);
 }
 
 // Simulated checkout card (real version: Razorpay checkout opens here). Shows a live 5-minute hold timer.
@@ -216,7 +230,9 @@ function showPayment(c) {
     if (left <= 0) {
       clearInterval(tick); card.remove();
       add(t("hold_gone"), "bot");
-      journeyDone = true; recover(c.slot_id, c.service); return;
+      journeyDone = true;
+      recover(c);
+      return;
     }
     show();
   }, 1000);
@@ -243,34 +259,33 @@ async function doPay(c, card, success) {
   } else {
     add(r.reply, "bot");
     journeyDone = true;
-    if (r.expired) recover(c.slot_id, c.service);
+    if (r.expired) recover(c);
   }
 }
 
-// Clean success card with the patient's own booking details, calendar link and cancel option
+// Success card: booking details, preparation instructions, QR check-in pass, calendar, reschedule and cancel
 function showConfirmation(r) {
   const d = r.details, card = document.createElement("div"); card.className = "ok";
-  const title = document.createElement("h4"); title.textContent = r.reply; card.appendChild(title);
+  const title = document.createElement("h4"); title.textContent = r.reply.split(" Before your visit:")[0]; card.appendChild(title);
   [[t("l_name"), d.name], [t("l_mobile"), d.mobile], [t("l_service"), d.service], [t("l_doctor"), d.doctor],
    [t("l_date"), d.date], [t("l_time"), d.time], [t("l_paid"), "\u20b9" + d.amount], [t("l_id"), d.receipt]].forEach(([k, v]) => {
     const row = document.createElement("div"); row.textContent = k + ": " + v; card.appendChild(row);
   });
+  if (d.prep) { const prep = document.createElement("div"); prep.className = "prep"; prep.textContent = d.prep; card.appendChild(prep); }
   const remind = document.createElement("div"); remind.className = "note"; remind.textContent = t("remind"); card.appendChild(remind);
+
+  const qr = document.createElement("img"); qr.alt = "QR";
+  qr.src = `/qr/${d.receipt}.svg?base=` + encodeURIComponent(location.origin);
+  const qrNote = document.createElement("div"); qrNote.className = "note"; qrNote.textContent = t("qr_note");
+  qr.onerror = () => { qr.remove(); qrNote.remove(); };   // no QR package installed: just hide it
+  card.append(qr, qrNote);
+
   const link = document.createElement("a");
   link.href = `/calendar/${d.receipt}`; link.textContent = t("cal");
+  const resch = document.createElement("button"); resch.textContent = t("resched");
   const cancel = document.createElement("button"); cancel.textContent = t("cancel");
-  cancel.onclick = async () => {
-    if (!confirm(t("cancel_q"))) return;
-    const res = await post("/cancel", {order_id: d.receipt, mobile: d.mobile});
-    add(res.reply, "bot");
-    if (res.ok) { cancel.remove(); link.remove(); card.style.opacity = "0.6"; }
-  };
-  const qr = document.createElement("img");                       // QR check-in pass for the reception desk
-  qr.src = `/qr/${d.receipt}.svg?base=${encodeURIComponent(location.origin)}`;
-  qr.alt = "QR"; qr.width = 120; qr.height = 120; qr.onerror = () => { qr.remove(); qrNote.remove(); };
-  const qrNote = document.createElement("div"); qrNote.className = "note"; qrNote.textContent = t("qr");
-  const resched = document.createElement("button"); resched.textContent = t("resched");
-  resched.onclick = async () => {
+
+  resch.onclick = async () => {
     const o = await post("/reschedule-options", {order_id: d.receipt, mobile: d.mobile});
     add(o.reply, "bot");
     if (!o.ok) return;
@@ -282,22 +297,28 @@ function showConfirmation(r) {
         wrap.remove();
         const x = await post("/reschedule", {order_id: d.receipt, mobile: d.mobile, slot_id: s.id});
         add(x.reply, "bot");
-        if (x.ok) { card.remove(); showConfirmation(x); }
+        if (x.ok) { card.remove(); showConfirmation({reply: x.reply, details: x.details}); }   // payment carries over
       };
       wrap.appendChild(b);
     });
     chat.appendChild(wrap); scroll();
   };
-  card.append(qr, qrNote, link, document.createElement("br"), resched, cancel);
+  cancel.onclick = async () => {
+    if (!confirm(t("cancel_q"))) return;
+    const res = await post("/cancel", {order_id: d.receipt, mobile: d.mobile});
+    add(res.reply, "bot");
+    if (res.ok) { cancel.remove(); resch.remove(); link.remove(); qr.remove(); qrNote.remove(); card.style.opacity = "0.6"; }
+  };
+  card.append(link, document.createElement("br"), resch, cancel);
   chat.appendChild(card); scroll();
 }
 
-// ---------- voice booking (Chrome: speech recognition) ----------
+// ---------- voice booking (Chrome: speech recognition, in the chosen language) ----------
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const mic = document.getElementById("mic");
 if (!SR) { mic.style.display = "none"; } else {
   mic.onclick = () => {
-    const rec = new SR(); rec.lang = VOICE[lang] || "en-IN";
+    const rec = new SR(); rec.lang = SPEECH[lang] || "en-IN";
     mic.textContent = "...";
     rec.onresult = e => { document.getElementById("msg").value = e.results[0][0].transcript; send(); };
     rec.onend = rec.onerror = () => { mic.innerHTML = "&#127908;"; };
