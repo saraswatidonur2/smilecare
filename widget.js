@@ -24,7 +24,7 @@
   var title = document.createElement("span"); title.textContent = clinic;
   var x = document.createElement("button"); x.id = "sc-x"; x.textContent = "\u00d7"; x.setAttribute("aria-label", "Close");
   bar.append(title, x);
-  var frame = document.createElement("iframe"); frame.title = clinic + " booking";
+  var frame = document.createElement("iframe"); frame.title = clinic + " booking"; frame.setAttribute("allow", "microphone");
   panel.append(bar, frame);
 
   function toggle(open) {

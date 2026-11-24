@@ -4,45 +4,79 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Doctor dashboard</title>
   <style>
-    body{font-family:sans-serif;max-width:800px;margin:20px auto;padding:0 12px}
+    body{font-family:sans-serif;max-width:900px;margin:20px auto;padding:0 12px}
+    .cards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+    .stat{border:1px solid #ddd;border-radius:8px;padding:10px 14px;min-width:110px}
+    .stat b{display:block;font-size:22px;color:#0d9488}
     table{width:100%;border-collapse:collapse;margin-top:10px}
     th,td{border-bottom:1px solid #ddd;padding:8px;text-align:left;font-size:14px}
     th{background:#f0fdfa}
-    select{padding:6px}
-    .paid{color:#0d9488;font-weight:600}
+    select,input{padding:6px;margin-right:8px}
+    button{padding:5px 8px;margin-right:4px;border:1px solid #0d9488;background:#fff;border-radius:6px;cursor:pointer}
+    .s-Confirmed{color:#0d9488;font-weight:600}.s-Completed{color:#15803d;font-weight:600}
+    .s-No-show{color:#b45309;font-weight:600}.s-Cancelled{color:#b91c1c;font-weight:600}
   </style>
 </head>
 <body>
-  <h2>SmileCare: today's and upcoming appointments</h2>
+  <h2>SmileCare: appointments</h2>
   <label>Doctor: <select id="doc"><option value="">All doctors</option></select></label>
+  <input id="q" placeholder="Search patient name or booking ID">
   <span id="msg"></span>
+  <div class="cards" id="cards"></div>
   <table>
-    <thead><tr><th>Date</th><th>Time</th><th>Patient</th><th>Mobile</th><th>Doctor</th><th>Reason</th><th>Payment</th></tr></thead>
+    <thead><tr><th>Date</th><th>Time</th><th>Patient</th><th>Mobile</th><th>Doctor</th><th>Reason</th><th>Booking ID</th><th>Status</th><th>Action</th></tr></thead>
     <tbody id="rows"></tbody>
   </table>
 <script>
 const key = new URLSearchParams(location.search).get("key") || "";
-const sel = document.getElementById("doc");
-let filled = false;
+const sel = document.getElementById("doc"), q = document.getElementById("q");
+let filled = false, all = [];
 
-function cell(tr, text, cls) { const td = document.createElement("td"); td.textContent = text; if (cls) td.className = cls; tr.appendChild(td); }
+function cell(tr, text, cls) { const td = document.createElement("td"); td.textContent = text; if (cls) td.className = cls; tr.appendChild(td); return td; }
+
+async function mark(order_id, status) {
+  await fetch("/api/status", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({key, order_id, status})});
+  load();
+}
+
+function draw() {
+  const body = document.getElementById("rows"), term = q.value.trim().toLowerCase();
+  body.innerHTML = "";
+  const list = all.filter(a => !term || a.patient.toLowerCase().includes(term) || a.order_id.toLowerCase().includes(term));
+  if (!list.length) { const tr = document.createElement("tr"); cell(tr, "No appointments found."); body.appendChild(tr); return; }
+  list.forEach(a => {
+    const tr = document.createElement("tr");
+    [a.date, a.time, a.patient, a.mobile, a.doctor, a.service, a.order_id].forEach(v => cell(tr, v));
+    cell(tr, a.status_label, "s-" + a.status_label);
+    const act = document.createElement("td");
+    if (a.status === "paid") {
+      const done = document.createElement("button"); done.textContent = "Completed"; done.onclick = () => mark(a.order_id, "completed");
+      const ns = document.createElement("button"); ns.textContent = "No-show"; ns.onclick = () => mark(a.order_id, "no_show");
+      act.append(done, ns);
+    }
+    tr.appendChild(act); body.appendChild(tr);
+  });
+}
+
+function stat(label, value) {
+  const d = document.createElement("div"); d.className = "stat";
+  const b = document.createElement("b"); b.textContent = value; d.append(b, document.createTextNode(label)); return d;
+}
 
 async function load() {
   const res = await fetch(`/api/appointments?key=${encodeURIComponent(key)}&doctor=${encodeURIComponent(sel.value)}`);
   const data = await res.json();
-  const msg = document.getElementById("msg"), body = document.getElementById("rows");
-  if (!data.ok) { msg.textContent = " " + data.reply + " Open this page as /dashboard?key=YOUR_KEY"; body.innerHTML = ""; return; }
+  const msg = document.getElementById("msg"), cards = document.getElementById("cards");
+  if (!data.ok) { msg.textContent = data.reply + " Open this page as /dashboard?key=YOUR_KEY"; cards.innerHTML = ""; document.getElementById("rows").innerHTML = ""; return; }
   msg.textContent = "";
   if (!filled) { data.doctors.forEach(d => { const o = document.createElement("option"); o.value = d; o.textContent = d; sel.appendChild(o); }); filled = true; }
-  body.innerHTML = "";
-  if (!data.appointments.length) { const tr = document.createElement("tr"); cell(tr, "No paid appointments yet."); body.appendChild(tr); return; }
-  data.appointments.forEach(a => {
-    const tr = document.createElement("tr");
-    [a.date, a.time, a.patient, a.mobile, a.doctor, a.service].forEach(v => cell(tr, v));
-    cell(tr, a.status, "paid"); body.appendChild(tr);
-  });
+  const s = data.summary;
+  cards.innerHTML = "";
+  cards.append(stat("Confirmed", s.confirmed), stat("Completed", s.completed), stat("No-show", s.no_show),
+               stat("Cancelled", s.cancelled), stat("Revenue (\u20b9)", s.revenue));
+  all = data.appointments; draw();
 }
-sel.onchange = load;
+sel.onchange = load; q.oninput = draw;
 load(); setInterval(load, 5000);   // refreshes by itself every 5 seconds
 </script>
 </body>

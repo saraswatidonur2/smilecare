@@ -5,38 +5,90 @@
   <title>SmileCare Booking</title>
   <style>
     :root{--brand:#0d9488}
-    body.embed{margin:8px auto}
     body{font-family:sans-serif;max-width:420px;margin:20px auto;padding:0 10px}
-    .head{display:flex;justify-content:space-between;align-items:center}
-    #counter{font-size:13px;color:var(--brand)}
+    body.embed{margin:8px auto}
+    .head{display:flex;justify-content:space-between;align-items:center;gap:6px}
+    .head h3{margin:8px 0}
+    #counter{font-size:13px;color:var(--brand);margin-left:6px}
     #chat{border:1px solid #ccc;border-radius:8px;padding:10px;height:340px;overflow:auto}
     #chat p{margin:6px 0}
     .me{text-align:right;color:var(--brand)}.bot{color:#222}
-    button{margin:4px 4px 0 0;padding:8px;border:1px solid var(--brand);background:#fff;border-radius:6px}
-    input{padding:8px;width:65%}
+    button{margin:4px 4px 0 0;padding:8px;border:1px solid var(--brand);background:#fff;border-radius:6px;cursor:pointer}
+    input{padding:8px;width:58%}
+    select{padding:5px}
     .pay{border:1px solid var(--brand);border-radius:8px;padding:10px;margin:8px 0;background:#f0fdfa}
-    .pay small{color:#666}
     .timer{font-size:13px;color:#b45309;margin:4px 0}
     .ok{border:1px solid #16a34a;border-radius:8px;padding:12px;margin:8px 0;background:#f0fdf4}
     .ok h4{margin:0 0 8px;color:#15803d}
     .ok div{margin:3px 0;font-size:14px}
+    .ok .note{color:#555;font-size:12px;margin-top:6px}
   </style>
 </head>
 <body>
-  <div class="head"><h3>SmileCare Booking</h3><span id="counter">Messages used: <b id="used">0</b>/5</span></div>
+  <div class="head">
+    <h3 id="title">SmileCare Booking</h3>
+    <div>
+      <select id="lang" aria-label="Language">
+        <option value="en">English</option><option value="hi">हिंदी</option><option value="kn">ಕನ್ನಡ</option>
+      </select>
+      <span id="counter"><span id="usedLbl"></span>: <b id="used">0</b>/5</span>
+    </div>
+  </div>
   <div id="chat"></div>
-  <input id="msg" placeholder="e.g. cleaning with Dr. Rao on Saturday morning">
-  <button onclick="send()">Send</button>
+  <input id="msg">
+  <button id="mic" title="Speak" aria-label="Speak">&#127908;</button>
+  <button id="sendBtn" onclick="send()"></button>
 
 <script>
-// Widget options come from the URL: ?embed=1&color=%230d9488&clinic=SmileCare
+// ---------- translations (Hindi and Kannada: have a native speaker check them) ----------
+const UI = {
+  en: {used:"Messages used", ph:"e.g. cleaning with Dr. Rao on Saturday morning", send:"Send",
+       mobile:"Enter your mobile number", mobile_ph:"10-digit mobile", otp:"Enter the 6-digit OTP", otp_ph:"OTP",
+       name:"Your name", name_ph:"Full name", pay:"Pay \u20b9{0}", held:"Your slot is held for you: ",
+       hold_gone:"Your 5-minute slot hold has expired. Please start again.",
+       l_name:"Name", l_mobile:"Mobile", l_service:"Service", l_doctor:"Doctor", l_date:"Date", l_time:"Time", l_paid:"Paid", l_id:"Booking ID",
+       cal:"Add to calendar", cancel:"Cancel appointment", cancel_q:"Cancel this appointment?",
+       remind:"Reminders: 24 hours and 2 hours before (WhatsApp/SMS in the live version)"},
+  hi: {used:"उपयोग किए गए संदेश", ph:"जैसे: शनिवार सुबह डॉ. राव के साथ सफाई", send:"भेजें",
+       mobile:"अपना मोबाइल नंबर दर्ज करें", mobile_ph:"10 अंकों का मोबाइल", otp:"6 अंकों का OTP दर्ज करें", otp_ph:"OTP",
+       name:"आपका नाम", name_ph:"पूरा नाम", pay:"\u20b9{0} का भुगतान करें", held:"आपका स्लॉट आपके लिए रोका गया है: ",
+       hold_gone:"आपका 5 मिनट का स्लॉट होल्ड समाप्त हो गया। कृपया फिर से शुरू करें।",
+       l_name:"नाम", l_mobile:"मोबाइल", l_service:"सेवा", l_doctor:"डॉक्टर", l_date:"तारीख", l_time:"समय", l_paid:"भुगतान", l_id:"बुकिंग आईडी",
+       cal:"कैलेंडर में जोड़ें", cancel:"अपॉइंटमेंट रद्द करें", cancel_q:"क्या यह अपॉइंटमेंट रद्द करें?",
+       remind:"रिमाइंडर: 24 घंटे और 2 घंटे पहले (लाइव संस्करण में WhatsApp/SMS)"},
+  kn: {used:"ಬಳಸಿದ ಸಂದೇಶಗಳು", ph:"ಉದಾ: ಶನಿವಾರ ಬೆಳಿಗ್ಗೆ ಡಾ. ರಾವ್ ಅವರೊಂದಿಗೆ ಕ್ಲೀನಿಂಗ್", send:"ಕಳುಹಿಸಿ",
+       mobile:"ನಿಮ್ಮ ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ನಮೂದಿಸಿ", mobile_ph:"10 ಅಂಕಿಯ ಮೊಬೈಲ್", otp:"6 ಅಂಕಿಯ OTP ನಮೂದಿಸಿ", otp_ph:"OTP",
+       name:"ನಿಮ್ಮ ಹೆಸರು", name_ph:"ಪೂರ್ಣ ಹೆಸರು", pay:"\u20b9{0} ಪಾವತಿಸಿ", held:"ನಿಮ್ಮ ಸ್ಲಾಟ್ ನಿಮಗಾಗಿ ಕಾಯ್ದಿರಿಸಲಾಗಿದೆ: ",
+       hold_gone:"ನಿಮ್ಮ 5 ನಿಮಿಷಗಳ ಸ್ಲಾಟ್ ಕಾಯ್ದಿರಿಕೆ ಮುಗಿದಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಾರಂಭಿಸಿ.",
+       l_name:"ಹೆಸರು", l_mobile:"ಮೊಬೈಲ್", l_service:"ಸೇವೆ", l_doctor:"ವೈದ್ಯರು", l_date:"ದಿನಾಂಕ", l_time:"ಸಮಯ", l_paid:"ಪಾವತಿ", l_id:"ಬುಕಿಂಗ್ ಐಡಿ",
+       cal:"ಕ್ಯಾಲೆಂಡರ್‌ಗೆ ಸೇರಿಸಿ", cancel:"ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ರದ್ದುಮಾಡಿ", cancel_q:"ಈ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ರದ್ದುಮಾಡಬೇಕೇ?",
+       remind:"ಜ್ಞಾಪನೆಗಳು: 24 ಗಂಟೆ ಮತ್ತು 2 ಗಂಟೆ ಮೊದಲು (ಲೈವ್ ಆವೃತ್ತಿಯಲ್ಲಿ WhatsApp/SMS)"}
+};
+const DOC = {"Dr. Rao": {hi:"डॉ. राव", kn:"ಡಾ. ರಾವ್"}, "Dr. Meena": {hi:"डॉ. मीना", kn:"ಡಾ. ಮೀನಾ"}};
+const DAYS = {hi: {Mon:"सोमवार",Tue:"मंगलवार",Wed:"बुधवार",Thu:"गुरुवार",Fri:"शुक्रवार",Sat:"शनिवार",Sun:"रविवार"},
+              kn: {Mon:"ಸೋಮವಾರ",Tue:"ಮಂಗಳವಾರ",Wed:"ಬುಧವಾರ",Thu:"ಗುರುವಾರ",Fri:"ಶುಕ್ರವಾರ",Sat:"ಶನಿವಾರ",Sun:"ಭಾನುವಾರ"}};
+let lang = "en";
+const t = (k, ...a) => { let s = (UI[lang] && UI[lang][k]) || UI.en[k]; a.forEach((v, i) => { s = s.replace("{" + i + "}", v); }); return s; };
+const docName = d => (DOC[d] && DOC[d][lang]) || d;
+const dayName = d => (DAYS[lang] && DAYS[lang][d]) || d;
+
+// ---------- widget options from the URL: ?embed=1&color=%230d9488&clinic=SmileCare ----------
 const params = new URLSearchParams(location.search);
 if (params.get("embed")) document.body.classList.add("embed");
 if (params.get("color")) document.documentElement.style.setProperty("--brand", params.get("color"));
-if (params.get("clinic")) document.querySelector(".head h3").textContent = params.get("clinic") + " Booking";
+if (params.get("clinic")) document.getElementById("title").textContent = params.get("clinic") + " Booking";
+
 const chat = document.getElementById("chat");
 let used = 0;
 let journeyDone = false;   // after a finished booking, the next request starts a fresh count
+
+function applyLang() {
+  document.getElementById("msg").placeholder = t("ph");
+  document.getElementById("sendBtn").textContent = t("send");
+  document.getElementById("usedLbl").textContent = t("used");
+  document.getElementById("lang").value = lang;
+}
+document.getElementById("lang").onchange = e => { lang = e.target.value; applyLang(); };
 
 const scroll = () => { chat.scrollTop = chat.scrollHeight; };
 function add(text, cls) {
@@ -48,7 +100,7 @@ const count = () => { used++; document.getElementById("used").textContent = used
 const resetCount = () => { used = 0; document.getElementById("used").textContent = 0; };
 
 async function post(url, body) {
-  const res = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
+  const res = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({...body, lang})});
   return res.json();
 }
 
@@ -58,7 +110,7 @@ function ask(label, placeholder, counts = true) {
     add(label, "bot");
     const wrap = document.createElement("div");
     const inp = document.createElement("input"); inp.placeholder = placeholder;
-    const btn = document.createElement("button"); btn.textContent = "Send";
+    const btn = document.createElement("button"); btn.textContent = t("send");
     btn.onclick = () => {
       const v = inp.value.trim(); if (!v) return;
       wrap.remove(); add(v, "me"); if (counts) count(); resolve(v);
@@ -73,6 +125,7 @@ async function send() {
   if (journeyDone) { resetCount(); journeyDone = false; }
   add(message, "me"); count(); box.value = "";
   const data = await post("/chat", {message});
+  if (data.lang && data.lang !== lang) { lang = data.lang; applyLang(); }   // follows the language the patient writes in
   add(data.reply, "bot");
   if (data.ui && data.ui.type === "slots") showSlots(data.ui.slots, data.ui.service);
 }
@@ -81,7 +134,7 @@ function showSlots(slots, service) {
   const wrap = document.createElement("div");
   slots.forEach(s => {
     const b = document.createElement("button");
-    b.textContent = `${s.doctor} · ${s.date} ${s.time}`;
+    b.textContent = `${docName(s.doctor)} \u00b7 ${dayName(s.date)} ${s.time}`;
     b.onclick = () => { wrap.remove(); book(s.id, service); };
     wrap.appendChild(b);
   });
@@ -90,22 +143,22 @@ function showSlots(slots, service) {
 
 // Booking flow: mobile -> OTP -> name -> pay -> confirmed
 async function book(slot_id, service) {
-  const mobile = await ask("Enter your mobile number", "10-digit mobile");
+  const mobile = await ask(t("mobile"), t("mobile_ph"));
   const o = await post("/send-otp", {slot_id, mobile});
   add(o.reply, "bot");
   if (!o.ok) { journeyDone = true; return; }
 
   let verified = false;
   for (let i = 0; i < 3 && !verified; i++) {
-    const otp = await ask("Enter the 6-digit OTP", "OTP", i === 0);
+    const otp = await ask(t("otp"), t("otp_ph"), i === 0);
     const v = await post("/verify-otp", {mobile, otp});
     add(v.reply, "bot");
     verified = v.ok;
-    if (!v.ok && v.reply.includes("start again")) { journeyDone = true; return; }
+    if (!v.ok && v.restart) { journeyDone = true; return; }
   }
   if (!verified) { journeyDone = true; return; }
 
-  const name = await ask("Your name", "Full name");
+  const name = await ask(t("name"), t("name_ph"));
   const c = await post("/create-order", {slot_id, name, mobile, service});
   add(c.reply, "bot");
   if (!c.ok) { journeyDone = true; return; }
@@ -115,20 +168,20 @@ async function book(slot_id, service) {
 // Simulated checkout card (real version: Razorpay checkout opens here). Shows a live 5-minute hold timer.
 function showPayment(c) {
   const card = document.createElement("div"); card.className = "pay";
-  const t = document.createElement("div"); t.style.fontWeight = "600";
-  t.textContent = `Pay \u20b9${c.amount} (test mode, order ${c.order_id})`;
+  const title = document.createElement("div"); title.style.fontWeight = "600";
+  title.textContent = `\u20b9${c.amount} (test mode, order ${c.order_id})`;
   const timer = document.createElement("div"); timer.className = "timer";
-  const pay = document.createElement("button"); pay.textContent = `Pay \u20b9${c.amount}`;
+  const pay = document.createElement("button"); pay.textContent = t("pay", c.amount);
   const fail = document.createElement("button"); fail.textContent = "Demo only: simulate failed payment";
 
   let left = c.hold_left;
-  const show = () => { timer.textContent = "Your slot is held for you: " + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0"); };
+  const show = () => { timer.textContent = t("held") + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0"); };
   show();
   const tick = setInterval(() => {
     left--;
     if (left <= 0) {
       clearInterval(tick); card.remove();
-      add("Your 5-minute slot hold has expired. Please start again.", "bot");
+      add(t("hold_gone"), "bot");
       journeyDone = true; return;
     }
     show();
@@ -137,11 +190,11 @@ function showPayment(c) {
   pay.onclick = () => { clearInterval(tick); doPay(c, card, true); };
   fail.onclick = () => { clearInterval(tick); doPay(c, card, false); };
   // failure button is shown only when the page is opened with ?demo
-  card.append(t, timer, pay); if (location.search.includes("demo")) card.append(fail);
+  card.append(title, timer, pay); if (location.search.includes("demo")) card.append(fail);
   chat.appendChild(card); scroll();
 }
 
-let failNote = null;   // the "payment failed" line; removed as soon as the patient retries or pays
+let failNote = null;   // the "payment unsuccessful" line; removed as soon as the patient retries or pays
 
 async function doPay(c, card, success) {
   card.remove();
@@ -159,18 +212,42 @@ async function doPay(c, card, success) {
   }
 }
 
-// Clean success card with the patient's own booking details
+// Clean success card with the patient's own booking details, calendar link and cancel option
 function showConfirmation(r) {
   const d = r.details, card = document.createElement("div"); card.className = "ok";
   const title = document.createElement("h4"); title.textContent = r.reply; card.appendChild(title);
-  [["Name", d.name], ["Mobile", d.mobile], ["Service", d.service], ["Doctor", d.doctor],
-   ["Date", d.date], ["Time", d.time], ["Paid", "\u20b9" + d.amount], ["Receipt", d.receipt]].forEach(([k, v]) => {
+  [[t("l_name"), d.name], [t("l_mobile"), d.mobile], [t("l_service"), d.service], [t("l_doctor"), d.doctor],
+   [t("l_date"), d.date], [t("l_time"), d.time], [t("l_paid"), "\u20b9" + d.amount], [t("l_id"), d.receipt]].forEach(([k, v]) => {
     const row = document.createElement("div"); row.textContent = k + ": " + v; card.appendChild(row);
   });
+  const remind = document.createElement("div"); remind.className = "note"; remind.textContent = t("remind"); card.appendChild(remind);
   const link = document.createElement("a");
-  link.href = `/calendar/${d.receipt}`; link.textContent = "Add to calendar";
-  card.appendChild(link); chat.appendChild(card); scroll();
+  link.href = `/calendar/${d.receipt}`; link.textContent = t("cal");
+  const cancel = document.createElement("button"); cancel.textContent = t("cancel");
+  cancel.onclick = async () => {
+    if (!confirm(t("cancel_q"))) return;
+    const res = await post("/cancel", {order_id: d.receipt, mobile: d.mobile});
+    add(res.reply, "bot");
+    if (res.ok) { cancel.remove(); link.remove(); card.style.opacity = "0.6"; }
+  };
+  card.append(link, document.createElement("br"), cancel);
+  chat.appendChild(card); scroll();
 }
+
+// ---------- voice booking (Chrome: speech recognition) ----------
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const mic = document.getElementById("mic");
+if (!SR) { mic.style.display = "none"; } else {
+  mic.onclick = () => {
+    const rec = new SR(); rec.lang = {en: "en-IN", hi: "hi-IN", kn: "kn-IN"}[lang];
+    mic.textContent = "...";
+    rec.onresult = e => { document.getElementById("msg").value = e.results[0][0].transcript; send(); };
+    rec.onend = rec.onerror = () => { mic.innerHTML = "&#127908;"; };
+    rec.start();
+  };
+}
+document.getElementById("msg").addEventListener("keydown", e => { if (e.key === "Enter") send(); });
+applyLang();
 </script>
 </body>
 </html>
