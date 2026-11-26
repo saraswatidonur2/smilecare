@@ -1,332 +1,178 @@
 <!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SmileCare Booking</title>
-  <style>
-    :root{--brand:#0d9488}
-    body{font-family:sans-serif;max-width:420px;margin:20px auto;padding:0 10px}
-    body.embed{margin:8px auto}
-    .head{display:flex;justify-content:space-between;align-items:center;gap:6px}
-    .head h3{margin:8px 0}
-    #counter{font-size:13px;color:var(--brand);margin-left:6px}
-    #chat{border:1px solid #ccc;border-radius:8px;padding:10px;height:340px;overflow:auto}
-    #chat p{margin:6px 0}
-    .me{text-align:right;color:var(--brand)}.bot{color:#222}
-    button{margin:4px 4px 0 0;padding:8px;border:1px solid var(--brand);background:#fff;border-radius:6px;cursor:pointer}
-    input{padding:8px;width:58%}
-    select{padding:5px}
-    .pay{border:1px solid var(--brand);border-radius:8px;padding:10px;margin:8px 0;background:#f0fdfa}
-    .timer{font-size:13px;color:#b45309;margin:4px 0}
-    .ok{border:1px solid #16a34a;border-radius:8px;padding:12px;margin:8px 0;background:#f0fdf4}
-    .ok h4{margin:0 0 8px;color:#15803d}
-    .ok div{margin:3px 0;font-size:14px}
-    .ok .note{color:#555;font-size:12px;margin-top:6px}
-    .ok .prep{background:#fff;border:1px dashed #16a34a;border-radius:6px;padding:8px;margin-top:8px;font-size:13px}
-    .ok img{width:140px;height:140px;display:block;margin-top:8px}
-  </style>
-</head>
-<body>
-  <div class="head">
-    <h3 id="title">SmileCare Booking</h3>
-    <div>
-      <select id="lang" aria-label="Language">
-        <option value="en">English</option><option value="hi">हिंदी</option><option value="kn">ಕನ್ನಡ</option>
-      </select>
-      <span id="counter"><span id="usedLbl"></span>: <b id="used">0</b>/5</span>
-    </div>
-  </div>
-  <div id="chat"></div>
-  <input id="msg">
-  <button id="mic" title="Speak" aria-label="Speak">&#127908;</button>
-  <button id="sendBtn" onclick="send()"></button>
-
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MediGuide AI</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0E6B78">
+<link rel="icon" href="icon.svg">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--leaf:#E4F2DD;--bg:#F6FAFA;--card:#fff;--ink:#12303A;--mut:#5B7680;--line:#DCE9EA;--pri:#0E6B78;--pri2:#0A525C;--mint:#DDF3EC;--sky:#E6F1FA;--sand:#FFF1DE;--red:#C93B3B;--redbg:#FDECEC;--ok:#1E8E5A;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--leaf:#1D3A24;--bg:#0D1B20;--card:#142A31;--ink:#E6F2F3;--mut:#93AEB5;--line:#244048;--pri:#4FC1CF;--pri2:#8ADBE5;--mint:#173A35;--sky:#16313F;--sand:#3A2E1A;--redbg:#3A1A1A;--red:#FF8A8A}}
+:root[data-theme="dark"]{--leaf:#1D3A24;--bg:#0D1B20;--card:#142A31;--ink:#E6F2F3;--mut:#93AEB5;--line:#244048;--pri:#4FC1CF;--pri2:#8ADBE5;--mint:#173A35;--sky:#16313F;--sand:#3A2E1A;--redbg:#3A1A1A;--red:#FF8A8A}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Figtree,system-ui,sans-serif}
+h1,h2,h3{font-family:Fraunces,Georgia,serif;margin:0 0 .4em;line-height:1.15}
+button{font:inherit;cursor:pointer;border:0;border-radius:12px;padding:.65em 1.1em;background:var(--pri);color:#fff;font-weight:600}
+button.g{background:transparent;color:var(--pri);border:1.5px solid var(--pri)}button.r{background:var(--red);color:#fff}button.s{padding:.4em .8em;font-size:.88rem}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #F2A93B;outline-offset:2px}
+input,select{font:inherit;padding:.65em .8em;border:1.5px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);width:100%}
+.wrap{max-width:1080px;margin:0 auto;padding:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px}
+.grid{display:grid;gap:14px}.g3{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.mut{color:var(--mut)}.sm{font-size:.88rem}
+.chip{display:inline-block;background:var(--mint);color:var(--pri2);border-radius:99px;padding:.2em .75em;font-size:.85rem;margin:3px 4px 3px 0}
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:28px;align-items:center;min-height:calc(100vh - 40px)}
+.hero h1{font-size:clamp(2.2rem,5vw,3.6rem)}.mock{background:linear-gradient(160deg,var(--sky),var(--mint));border-radius:28px;padding:22px}
+.bub{padding:.6em .9em;border-radius:16px;margin:8px 0;max-width:88%;box-shadow:0 1px 0 var(--line)}.bub.b{background:var(--card)}.bub.u{background:var(--pri);color:#fff;margin-left:auto}
+nav{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
+nav .in{display:flex;gap:4px;overflow-x:auto;align-items:center;max-width:1080px;margin:auto;padding:8px 12px}
+nav button{background:transparent;color:var(--mut);white-space:nowrap;padding:.5em .85em}nav button.on{background:var(--mint);color:var(--pri2)}
+.brand{font:700 1.1rem Fraunces,serif;color:var(--pri);margin-right:8px;white-space:nowrap}
+.st{font-size:.8rem;border-radius:99px;padding:.2em .7em;margin-left:auto;white-space:nowrap}.live{background:var(--mint);color:var(--ok)}.off{background:var(--sand);color:#B56A00}
+.dept{border-radius:22px;padding:22px;color:var(--ink);cursor:pointer;border:1px solid var(--line)}.dept .ic{font-size:2.4rem}
+.chat{display:flex;flex-direction:column;height:calc(100vh - 150px);min-height:480px}.msgs{flex:1;overflow:auto;padding:6px}
+.slot{background:var(--sky);color:var(--ink);border:1.5px solid var(--line);margin:4px 4px 0 0;text-align:left}.slot:hover{border-color:var(--pri)}
+.warn{background:var(--redbg);border:2px solid var(--red);border-radius:16px;padding:14px;margin:8px 0}
+.prog{display:flex;gap:4px;font-size:.78rem;margin:8px 0}.prog span{flex:1;text-align:center;padding:.3em;border-radius:99px;background:var(--line);color:var(--mut)}.prog .d{background:var(--pri);color:#fff}
+.ok{border:2px solid var(--ok);border-radius:18px;padding:14px;background:var(--mint)}
+.inp{display:flex;gap:8px;padding-top:8px}.mic{width:48px;border-radius:50%;padding:0;height:48px}.mic.rec{background:var(--red);animation:p 1s infinite}@keyframes p{50%{opacity:.5}}
+table{width:100%;border-collapse:collapse}td,th{padding:.5em;border-bottom:1px solid var(--line);text-align:left;font-size:.92rem}
+.bar{height:10px;border-radius:9px;background:var(--pri);margin:4px 0}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:.7em 1.2em;border-radius:14px;z-index:99;display:none;max-width:90vw}
+@media(max-width:760px){.hero{grid-template-columns:1fr;min-height:0}.wrap{padding:12px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important}}
+</style></head><body>
+<div id="app"></div><div id="toast" role="status"></div>
 <script>
-// ---------- screen text (Hindi and Kannada: have a native speaker check them; other languages are translated by the server) ----------
-const UI = {
-  en: {used:"Messages used", ph:"e.g. fever and cough, or cleaning with Dr. Rao on Saturday morning", send:"Send",
-       mobile:"Enter your mobile number", mobile_ph:"10-digit mobile", otp:"Enter the 6-digit OTP", otp_ph:"OTP",
-       name:"Your name", name_ph:"Full name", pay:"Pay \u20b9{0}", held:"Your slot is held for you: ",
-       hold_gone:"Your 5-minute slot hold has expired.",
-       l_name:"Name", l_mobile:"Mobile", l_service:"Service", l_doctor:"Doctor", l_date:"Date", l_time:"Time", l_paid:"Paid", l_id:"Booking ID",
-       cal:"Add to calendar", cancel:"Cancel appointment", cancel_q:"Cancel this appointment?", resched:"Reschedule",
-       qr_note:"Show this QR code at the clinic reception",
-       remind:"Reminders: 24 hours and 2 hours before (WhatsApp/SMS in the live version)"},
-  hi: {used:"उपयोग किए गए संदेश", ph:"जैसे: बुखार और खांसी, या शनिवार सुबह डॉ. राव के साथ सफाई", send:"भेजें",
-       mobile:"अपना मोबाइल नंबर दर्ज करें", mobile_ph:"10 अंकों का मोबाइल", otp:"6 अंकों का OTP दर्ज करें", otp_ph:"OTP",
-       name:"आपका नाम", name_ph:"पूरा नाम", pay:"\u20b9{0} का भुगतान करें", held:"आपका स्लॉट आपके लिए रोका गया है: ",
-       hold_gone:"आपका 5 मिनट का स्लॉट होल्ड समाप्त हो गया।",
-       l_name:"नाम", l_mobile:"मोबाइल", l_service:"सेवा", l_doctor:"डॉक्टर", l_date:"तारीख", l_time:"समय", l_paid:"भुगतान", l_id:"बुकिंग आईडी",
-       cal:"कैलेंडर में जोड़ें", cancel:"अपॉइंटमेंट रद्द करें", cancel_q:"क्या यह अपॉइंटमेंट रद्द करें?", resched:"समय बदलें",
-       qr_note:"यह QR कोड क्लिनिक रिसेप्शन पर दिखाएँ",
-       remind:"रिमाइंडर: 24 घंटे और 2 घंटे पहले (लाइव संस्करण में WhatsApp/SMS)"},
-  kn: {used:"ಬಳಸಿದ ಸಂದೇಶಗಳು", ph:"ಉದಾ: ಜ್ವರ ಮತ್ತು ಕೆಮ್ಮು, ಅಥವಾ ಶನಿವಾರ ಬೆಳಿಗ್ಗೆ ಡಾ. ರಾವ್ ಅವರೊಂದಿಗೆ ಕ್ಲೀನಿಂಗ್", send:"ಕಳುಹಿಸಿ",
-       mobile:"ನಿಮ್ಮ ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ನಮೂದಿಸಿ", mobile_ph:"10 ಅಂಕಿಯ ಮೊಬೈಲ್", otp:"6 ಅಂಕಿಯ OTP ನಮೂದಿಸಿ", otp_ph:"OTP",
-       name:"ನಿಮ್ಮ ಹೆಸರು", name_ph:"ಪೂರ್ಣ ಹೆಸರು", pay:"\u20b9{0} ಪಾವತಿಸಿ", held:"ನಿಮ್ಮ ಸ್ಲಾಟ್ ನಿಮಗಾಗಿ ಕಾಯ್ದಿರಿಸಲಾಗಿದೆ: ",
-       hold_gone:"ನಿಮ್ಮ 5 ನಿಮಿಷಗಳ ಸ್ಲಾಟ್ ಕಾಯ್ದಿರಿಕೆ ಮುಗಿದಿದೆ.",
-       l_name:"ಹೆಸರು", l_mobile:"ಮೊಬೈಲ್", l_service:"ಸೇವೆ", l_doctor:"ವೈದ್ಯರು", l_date:"ದಿನಾಂಕ", l_time:"ಸಮಯ", l_paid:"ಪಾವತಿ", l_id:"ಬುಕಿಂಗ್ ಐಡಿ",
-       cal:"ಕ್ಯಾಲೆಂಡರ್‌ಗೆ ಸೇರಿಸಿ", cancel:"ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ರದ್ದುಮಾಡಿ", cancel_q:"ಈ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ರದ್ದುಮಾಡಬೇಕೇ?", resched:"ಸಮಯ ಬದಲಿಸಿ",
-       qr_note:"ಈ QR ಕೋಡ್ ಅನ್ನು ಕ್ಲಿನಿಕ್ ಸ್ವಾಗತದಲ್ಲಿ ತೋರಿಸಿ",
-       remind:"ಜ್ಞಾಪನೆಗಳು: 24 ಗಂಟೆ ಮತ್ತು 2 ಗಂಟೆ ಮೊದಲು (ಲೈವ್ ಆವೃತ್ತಿಯಲ್ಲಿ WhatsApp/SMS)"}
-};
-const DOC = {"Dr. Rao": {hi:"डॉ. राव", kn:"ಡಾ. ರಾವ್"}, "Dr. Meena": {hi:"डॉ. मीना", kn:"ಡಾ. ಮೀನಾ"}};
-const DAYS = {hi: {Mon:"सोमवार",Tue:"मंगलवार",Wed:"बुधवार",Thu:"गुरुवार",Fri:"शुक्रवार",Sat:"शनिवार",Sun:"रविवार"},
-              kn: {Mon:"ಸೋಮವಾರ",Tue:"ಮಂಗಳವಾರ",Wed:"ಬುಧವಾರ",Thu:"ಗುರುವಾರ",Fri:"ಶುಕ್ರವಾರ",Sat:"ಶನಿವಾರ",Sun:"ಭಾನುವಾರ"}};
-const SPEECH = {en:"en-IN",hi:"hi-IN",kn:"kn-IN",bn:"bn-IN",te:"te-IN",mr:"mr-IN",ta:"ta-IN",ur:"ur-IN",gu:"gu-IN",ml:"ml-IN",or:"or-IN",pa:"pa-IN",as:"as-IN",ne:"ne-NP"};
-const BASE_KEYS = Object.keys(UI.en);
-const tCache = {};      // screen text for languages translated by the server
-let lang = "en";
-const t = (k, ...a) => {
-  const table = UI[lang] || tCache[lang] || {};
-  let s = table[k] || UI.en[k];
-  a.forEach((v, i) => { s = s.replace("{" + i + "}", v); });
-  return s;
-};
-const docName = d => (DOC[d] && DOC[d][lang]) || d;
-const dayName = d => (DAYS[lang] && DAYS[lang][d]) || d;
-
-// ---------- widget options from the URL: ?embed=1&color=%230d9488&clinic=SmileCare ----------
-const params = new URLSearchParams(location.search);
-if (params.get("embed")) document.body.classList.add("embed");
-if (params.get("color")) document.documentElement.style.setProperty("--brand", params.get("color"));
-if (params.get("clinic")) document.getElementById("title").textContent = params.get("clinic") + " Booking";
-
-const chat = document.getElementById("chat");
-const langSel = document.getElementById("lang");
-let used = 0;
-let journeyDone = false;   // after a finished booking, the next request starts a fresh count
-
-function applyLang() {
-  document.getElementById("msg").placeholder = t("ph");
-  document.getElementById("sendBtn").textContent = t("send");
-  document.getElementById("usedLbl").textContent = t("used");
-  langSel.value = lang;
-}
-// Switching language: hi/kn use the text above; every other language is translated once by the server.
-async function setLang(code) {
-  lang = code;
-  if (!UI[code] && !tCache[code]) {
-    try {
-      const r = await fetch("/api/translate", {method: "POST", headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({lang: code, texts: BASE_KEYS.map(k => UI.en[k])})}).then(x => x.json());
-      if (r.ok) { const o = {}; BASE_KEYS.forEach((k, i) => { o[k] = r.texts[i]; }); tCache[code] = o; }
-    } catch (e) { /* stay in English if the translation service is unreachable */ }
-  }
-  applyLang();
-}
-langSel.onchange = e => setLang(e.target.value);
-// Fill the language list from the server (all Indian languages it supports)
-(async function loadLangs() {
-  try {
-    const r = await fetch("/api/languages").then(x => x.json());
-    if (r.languages && r.languages.length) {
-      langSel.innerHTML = "";
-      r.languages.forEach(l => { const o = document.createElement("option"); o.value = l.code; o.textContent = l.name; langSel.appendChild(o); });
-      langSel.value = lang;
-    }
-  } catch (e) { /* keep the three built-in options */ }
-})();
-
-const scroll = () => { chat.scrollTop = chat.scrollHeight; };
-function add(text, cls) {
-  const p = document.createElement("p"); p.className = cls; p.textContent = text;   // textContent = safe from injected HTML
-  chat.appendChild(p); scroll();
-  return p;
-}
-const count = () => { used++; document.getElementById("used").textContent = used; };
-const resetCount = () => { used = 0; document.getElementById("used").textContent = 0; };
-
-async function post(url, body) {
-  const res = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({...body, lang})});
-  return res.json();
-}
-
-// Shows an input inside the chat and waits for the patient's answer. Retries don't use up the message budget.
-function ask(label, placeholder, counts = true) {
-  return new Promise(resolve => {
-    add(label, "bot");
-    const wrap = document.createElement("div");
-    const inp = document.createElement("input"); inp.placeholder = placeholder;
-    const btn = document.createElement("button"); btn.textContent = t("send");
-    btn.onclick = () => {
-      const v = inp.value.trim(); if (!v) return;
-      wrap.remove(); add(v, "me"); if (counts) count(); resolve(v);
-    };
-    inp.addEventListener("keydown", e => { if (e.key === "Enter") btn.onclick(); });
-    wrap.append(inp, btn); chat.appendChild(wrap); inp.focus(); scroll();
-  });
-}
-
-async function send() {
-  const box = document.getElementById("msg");
-  const message = box.value.trim(); if (!message) return;
-  if (journeyDone) { resetCount(); journeyDone = false; }
-  add(message, "me"); count(); box.value = "";
-  let data;
-  try { data = await post("/chat", {message}); } catch (e) { add("Connection problem. Please try again.", "bot"); return; }
-  if (data.lang && data.lang !== lang) await setLang(data.lang);   // follows the language the patient writes in
-  add(data.reply, "bot");
-  if (data.ui && data.ui.type === "slots") showSlots(data.ui.slots, data.ui.service);
-}
-
-function showSlots(slots, service) {
-  const wrap = document.createElement("div");
-  slots.forEach(s => {
-    const b = document.createElement("button");
-    b.textContent = `${docName(s.doctor)}${s.specialty ? " (" + s.specialty + ")" : ""} \u00b7 ${dayName(s.date)} ${s.time}`;
-    b.onclick = () => { wrap.remove(); book(s.id, service); };
-    wrap.appendChild(b);
-  });
-  chat.appendChild(wrap); scroll();
-}
-
-// Booking flow: mobile -> OTP -> (name, only if new) -> pay -> confirmed
-async function book(slot_id, service) {
-  const mobile = await ask(t("mobile"), t("mobile_ph"));
-  const o = await post("/send-otp", {slot_id, mobile});
-  add(o.reply, "bot");
-  if (!o.ok) { journeyDone = true; return; }
-
-  let verified = false, known = null;
-  for (let i = 0; i < 3 && !verified; i++) {
-    const otp = await ask(t("otp"), t("otp_ph"), i === 0);
-    const v = await post("/verify-otp", {mobile, otp});
-    add(v.reply, "bot");
-    verified = v.ok;
-    if (v.ok) known = v.patient;
-    if (!v.ok && v.restart) { journeyDone = true; return; }
-  }
-  if (!verified) { journeyDone = true; return; }
-
-  // returning patients are never asked for their name again
-  const name = (known && known.name) || await ask(t("name"), t("name_ph"));
-  const c = await post("/create-order", {slot_id, name, mobile, service});
-  add(c.reply, "bot");
-  if (!c.ok) { journeyDone = true; return; }
-  showPayment(c);
-}
-
-// When a hold ends without payment, offer the nearest free slots instead of a dead end
-async function recover(c) {
-  const r = await post("/recover", {slot_id: c.slot_id, service: c.service});
-  if (r.reply) add(r.reply, "bot");
-  if (r.ok && r.slots) showSlots(r.slots, r.service);
-}
-
-// Simulated checkout card (real version: Razorpay checkout opens here). Shows a live 5-minute hold timer.
-function showPayment(c) {
-  const card = document.createElement("div"); card.className = "pay";
-  const title = document.createElement("div"); title.style.fontWeight = "600";
-  title.textContent = `\u20b9${c.amount} (test mode, order ${c.order_id})`;
-  const timer = document.createElement("div"); timer.className = "timer";
-  const pay = document.createElement("button"); pay.textContent = t("pay", c.amount);
-  const fail = document.createElement("button"); fail.textContent = "Demo only: simulate failed payment";
-
-  let left = c.hold_left;
-  const show = () => { timer.textContent = t("held") + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0"); };
-  show();
-  const tick = setInterval(() => {
-    left--;
-    if (left <= 0) {
-      clearInterval(tick); card.remove();
-      add(t("hold_gone"), "bot");
-      journeyDone = true;
-      recover(c);
-      return;
-    }
-    show();
-  }, 1000);
-
-  pay.onclick = () => { clearInterval(tick); doPay(c, card, true); };
-  fail.onclick = () => { clearInterval(tick); doPay(c, card, false); };
-  // failure button is shown only when the page is opened with ?demo
-  card.append(title, timer, pay); if (location.search.includes("demo")) card.append(fail);
-  chat.appendChild(card); scroll();
-}
-
-let failNote = null;   // the "payment unsuccessful" line; removed as soon as the patient retries or pays
-
-async function doPay(c, card, success) {
-  card.remove();
-  const r = await post("/pay-demo", {order_id: c.order_id, success});
-  if (failNote) { failNote.remove(); failNote = null; }
-  if (r.ok) {
-    journeyDone = true;
-    showConfirmation(r);
-  } else if (r.retry) {
-    failNote = add(r.reply, "bot");   // slot stays held; the patient can pay again
-    showPayment({...c, hold_left: r.hold_left});
-  } else {
-    add(r.reply, "bot");
-    journeyDone = true;
-    if (r.expired) recover(c);
-  }
-}
-
-// Success card: booking details, preparation instructions, QR check-in pass, calendar, reschedule and cancel
-function showConfirmation(r) {
-  const d = r.details, card = document.createElement("div"); card.className = "ok";
-  const title = document.createElement("h4"); title.textContent = r.reply.split(" Before your visit:")[0]; card.appendChild(title);
-  [[t("l_name"), d.name], [t("l_mobile"), d.mobile], [t("l_service"), d.service], [t("l_doctor"), d.doctor],
-   [t("l_date"), d.date], [t("l_time"), d.time], [t("l_paid"), "\u20b9" + d.amount], [t("l_id"), d.receipt]].forEach(([k, v]) => {
-    const row = document.createElement("div"); row.textContent = k + ": " + v; card.appendChild(row);
-  });
-  if (d.prep) { const prep = document.createElement("div"); prep.className = "prep"; prep.textContent = d.prep; card.appendChild(prep); }
-  const remind = document.createElement("div"); remind.className = "note"; remind.textContent = t("remind"); card.appendChild(remind);
-
-  const qr = document.createElement("img"); qr.alt = "QR";
-  qr.src = `/qr/${d.receipt}.svg?base=` + encodeURIComponent(location.origin);
-  const qrNote = document.createElement("div"); qrNote.className = "note"; qrNote.textContent = t("qr_note");
-  qr.onerror = () => { qr.remove(); qrNote.remove(); };   // no QR package installed: just hide it
-  card.append(qr, qrNote);
-
-  const link = document.createElement("a");
-  link.href = `/calendar/${d.receipt}`; link.textContent = t("cal");
-  const resch = document.createElement("button"); resch.textContent = t("resched");
-  const cancel = document.createElement("button"); cancel.textContent = t("cancel");
-
-  resch.onclick = async () => {
-    const o = await post("/reschedule-options", {order_id: d.receipt, mobile: d.mobile});
-    add(o.reply, "bot");
-    if (!o.ok) return;
-    const wrap = document.createElement("div");
-    o.slots.forEach(s => {
-      const b = document.createElement("button");
-      b.textContent = `${docName(s.doctor)} \u00b7 ${dayName(s.date)} ${s.time}`;
-      b.onclick = async () => {
-        wrap.remove();
-        const x = await post("/reschedule", {order_id: d.receipt, mobile: d.mobile, slot_id: s.id});
-        add(x.reply, "bot");
-        if (x.ok) { card.remove(); showConfirmation({reply: x.reply, details: x.details}); }   // payment carries over
-      };
-      wrap.appendChild(b);
-    });
-    chat.appendChild(wrap); scroll();
-  };
-  cancel.onclick = async () => {
-    if (!confirm(t("cancel_q"))) return;
-    const res = await post("/cancel", {order_id: d.receipt, mobile: d.mobile});
-    add(res.reply, "bot");
-    if (res.ok) { cancel.remove(); resch.remove(); link.remove(); qr.remove(); qrNote.remove(); card.style.opacity = "0.6"; }
-  };
-  card.append(link, document.createElement("br"), resch, cancel);
-  chat.appendChild(card); scroll();
-}
-
-// ---------- voice booking (Chrome: speech recognition, in the chosen language) ----------
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-const mic = document.getElementById("mic");
-if (!SR) { mic.style.display = "none"; } else {
-  mic.onclick = () => {
-    const rec = new SR(); rec.lang = SPEECH[lang] || "en-IN";
-    mic.textContent = "...";
-    rec.onresult = e => { document.getElementById("msg").value = e.results[0][0].transcript; send(); };
-    rec.onend = rec.onerror = () => { mic.innerHTML = "&#127908;"; };
-    rec.start();
-  };
-}
-document.getElementById("msg").addEventListener("keydown", e => { if (e.key === "Enter") send(); });
-applyLang();
-</script>
-</body>
-</html>
+const $=s=>document.querySelector(s),E=document.getElementById('app');
+const LANGS=[['en','English','en-IN',"Hi! 👋 How can I help you today?"],['hi','हिन्दी','hi-IN',"नमस्ते! 👋 मैं आपकी कैसे मदद कर सकता हूँ?"],['kn','ಕನ್ನಡ','kn-IN',"ನಿಮಗೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಬಹುದು?"],['te','తెలుగు','te-IN',"నేను మీకు ఎలా సహాయం చేయగలను?"],['ta','தமிழ்','ta-IN',"நான் உங்களுக்கு எப்படி உதவ முடியும்?"],['ml','മലയാളം','ml-IN',"ഞാൻ നിങ്ങളെ എങ്ങനെ സഹായിക്കണം?"],['mr','मराठी','mr-IN',"मी तुम्हाला कशी मदत करू?"],['bn','বাংলা','bn-IN',"আমি আপনাকে কীভাবে সাহায্য করতে পারি?"],['gu','ગુજરાતી','gu-IN',"હું તમને કેવી રીતે મદદ કરી શકું?"],['pa','ਪੰਜਾਬੀ','pa-IN',"ਮੈਂ ਤੁਹਾਡੀ ਕਿਵੇਂ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ?"],['or','ଓଡ଼ିଆ','or-IN',"ମୁଁ ଆପଣଙ୍କୁ କିପରି ସାହାଯ୍ୟ କରିପାରିବି?"],['ur','اردو','ur-IN',"میں آپ کی کیسے مدد کر سکتا ہوں؟"]];
+const T={en:{found:'I can help with that. Here are available appointments:',alt:'That time isn’t available. I found these alternatives:',none:'No suitable slot is currently available.',who:'Who is this appointment for?'},hi:{found:'मैं मदद कर सकता हूँ। उपलब्ध अपॉइंटमेंट:',alt:'वह समय उपलब्ध नहीं है। ये विकल्प हैं:',none:'अभी कोई उपयुक्त स्लॉट उपलब्ध नहीं है।',who:'यह अपॉइंटमेंट किसके लिए है?'},kn:{found:'ಸಹಾಯ ಮಾಡುತ್ತೇನೆ. ಲಭ್ಯವಿರುವ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್‌ಗಳು:',alt:'ಆ ಸಮಯ ಲಭ್ಯವಿಲ್ಲ. ಪರ್ಯಾಯಗಳು:',none:'ಸೂಕ್ತ ಸ್ಲಾಟ್ ಈಗ ಲಭ್ಯವಿಲ್ಲ.',who:'ಈ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಯಾರಿಗಾಗಿ?'}};
+const DP={dental:{n:'Dental Care',ic:'😁',bg:'var(--sky)',d:'Dental consultations, cleaning, tooth pain, gums, braces, root canal, implants and other dental services.',sv:['Dental Check-up','Teeth Cleaning','Tooth Pain','Gum Problems','Cavities','Root Canal','Braces / Orthodontics','Dental Implants','Wisdom Tooth','Cosmetic Dentistry','Emergency Dental Care']},general:{n:'General Healthcare',ic:'🏥',bg:'var(--mint)',d:'Consult doctors for common illnesses, chronic conditions, general health concerns and medical check-ups.',sv:['Fever','Cold','Cough','Headache','Body Pain','Stomach Problems','Allergy','Skin Problems','Blood Pressure','Blood Sugar / Diabetes','Thyroid','Cholesterol','Asthma','General Check-up','Women’s Health','Men’s Health','Child Health','Elderly Care','Preventive Check-up','Follow-up Consultation','General Physician']},physio:{n:'Physiotherapy & Rehabilitation',ic:'💪',bg:'var(--sand)',d:'Personalized physiotherapy and rehabilitation support for pain, mobility, recovery and physical wellness.',sv:['Back Pain','Neck Pain','Knee Pain','Shoulder Pain','Joint Pain','Sports Injury','Post-Surgery Rehab','Post-Fracture Rehab','Muscle Recovery','Posture Problems','Mobility Training','Balance Training','Elderly Physiotherapy','Stroke Rehabilitation','General Physiotherapy']},ayur:{n:'Ayurveda',ic:'🌿',bg:'var(--leaf)',d:'Panchakarma, digestion, stress, sleep, joint and skin care through traditional Ayurvedic consultation.',sv:['Panchakarma','Digestion Problems','Stress','Sleep Problems','Joint Care','Skin Care','Ayurvedic Consultation']}};
+const D=[];const mk=(dp,a)=>a.forEach(x=>D.push({id:D.length,dp,n:x[0],ph:x[1],sp:x[2],ex:x[3],fee:x[4],k:x[5]}));
+mk('dental',[['Dr. Saraswati Donur','8147969656','Dentist · Endodontics','14 yrs',500,'saraswati donur'],['Dr. Arjun Mehta','9000012345','Orthodontist','11 yrs',500,'arjun mehta'],['Dr. Priya Sharma','9000012346','Cosmetic Dentist','9 yrs',500,'priya sharma'],['Dr. Rahul Desai','9000012347','Oral Surgeon','12 yrs',500,'rahul desai']]);
+mk('general',[['Dr. Shubhangi Desai','7676923453','General Physician','15 yrs',500,'shubhangi'],['Dr. Vikram Rao','9000023451','Internal Medicine','18 yrs',500,'rao'],['Dr. Ananya Iyer','9000023452','Family Medicine','8 yrs',500,'ananya'],['Dr. Rohan Kulkarni','9000023453','Child & Adult Care','10 yrs',500,'rohan']]);
+mk('physio',[['Dr. Tasbiya Burli','7353209373','Musculoskeletal Physio','9 yrs',500,'tasbiya'],['Dr. Neha Patil','9000034561','Sports Rehabilitation','7 yrs',500,'neha'],['Dr. Karan Shah','9000034562','Neuro Rehabilitation','12 yrs',500,'karan'],['Dr. Meera Nair','9000034563','Geriatric Physio','10 yrs',500,'meera']]);
+mk('ayur',[['Dr. Kavya Menon','9000045671','Ayurvedic Physician','10 yrs',500,'kavya'],['Dr. Sanjay Joshi','9000045672','Panchakarma Specialist','12 yrs',500,'sanjay'],['Dr. Lakshmi Pillai','9000045673','Ayurvedic Dermatology','8 yrs',500,'lakshmi'],['Dr. Arvind Rao','9000045674','Ayurvedic Medicine','15 yrs',500,'arvind']]);
+const HOSP=['Smile Craft Dental Hospital','Smile Craft Dental Hospital','PearlWhite Dental & Implant Centre','PearlWhite Dental & Implant Centre','Sanjeevani Multispeciality Hospital','Sanjeevani Multispeciality Hospital','CarePoint Family Hospital','CarePoint Family Hospital','MoveWell Physio & Rehab Centre','MoveWell Physio & Rehab Centre','Kinetic Rehab & Sports Clinic','Kinetic Rehab & Sports Clinic','Ayushya Ayurveda Hospital','Ayushya Ayurveda Hospital','Vedic Wellness Panchakarma Centre','Vedic Wellness Panchakarma Centre'];D.forEach((d,i)=>d.h=HOSP[i]);
+const TIMES=['09:00','10:30','11:30','14:00','16:30','18:00'],DAYS=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+const pad=n=>String(n).padStart(2,'0'),iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const addD=k=>{const d=new Date();d.setDate(d.getDate()+k);return d};
+const fd=s=>new Date(s+'T12:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
+const ft=t=>{let h=+t.slice(0,2);return pad(h%12||12)+':'+t.slice(3)+(h<12?' AM':' PM')};
+let S=load();function load(){try{return JSON.parse(localStorage.getItem('hc'))||null}catch(e){return null}}
+function save(){try{localStorage.setItem('hc',JSON.stringify(S))}catch(e){}}
+function fresh(){return{user:null,lang:'en',appts:[],wait:[],freed:[],fam:[],prefs:{},cancelled:0}}
+S=S||fresh();let HS=null,V='landing',DEPT='general',MSG=[],FLOW=null,REG=[],OTP=null,ONLINE=navigator.onLine,voice=false,reg={},idle;
+const L=()=>LANGS.find(l=>l[0]==S.lang)||LANGS[0],t=k=>(T[S.lang]||T.en)[k]||T.en[k];
+function toast(m){const e=$('#toast');e.textContent=m;e.style.display='block';clearTimeout(e._t);e._t=setTimeout(()=>e.style.display='none',3000)}
+function slots(doc,from=0,n=7){const r=[];for(let k=from;k<from+n;k++){const di=iso(addD(k));TIMES.forEach((tm,j)=>{let st=(doc.id*5+k*3+j)%4==0?'Booked':'Available';const key=doc.id+'|'+di+'|'+tm;if(S.freed.includes(key))st='Available';if(k==0&&+tm.slice(0,2)<=new Date().getHours())st='Past';if(S.appts.some(a=>a.doc==doc.id&&a.date==di&&a.t==tm&&a.st=='Confirmed'))st='Booked';if(st!='Past')r.push({doc:doc.id,date:di,t:tm,st,k})})}return r}
+function seed(){S.appts=[{id:1,doc:4,date:iso(addD((6-new Date().getDay()+7)%7||7)),t:'10:30',st:'Confirmed',who:'Self',type:'Consultation',paid:500},{id:2,doc:0,date:iso(addD(-40)),t:'11:30',st:'Completed',who:'Self',type:'Check-up',paid:500},{id:3,doc:6?6:6,date:iso(addD(-90)),t:'09:00',st:'Completed',who:'Self',type:'Consultation',paid:500}];S.prefs={doc:4,time:'Morning',dept:'general'}}
+function go(v,d){V=v;if(d){DEPT=d;HS=null}render();scrollTo(0,0)}
+function bump(){clearTimeout(idle);idle=setTimeout(()=>{if(S.user){logout();toast('Signed out after 15 minutes of inactivity')}},9e5)}
+addEventListener('click',bump);
+addEventListener('online',()=>{ONLINE=true;toast('Back Online — queued demo actions synced');render()});addEventListener('offline',()=>{ONLINE=false;render()});
+function logout(){S.user=null;save();MSG=[];FLOW=null;go('landing')}
+function nav(){const it=[['home','Home'],['dental','Dental'],['general','General Healthcare'],['physio','Physiotherapy'],['ayur','Ayurveda'],['chat','AI Assistant'],['appts','Appointments'],['profile','Profile'],['admin','Admin']];
+return`<nav><div class="in"><span class="brand">✚ MediGuide AI</span>${it.map(x=>`<button class="${V==x[0]?'on':''}" onclick="${['dental','general','physio','ayur'].includes(x[0])?`go('dept','${x[0]}')`:`go('${x[0]}')`}">${x[1]}</button>`).join('')}<span class="st ${ONLINE?'live':'off'}">${ONLINE?'🟢 Live Mode':'🟠 Offline Demo Mode'}</span></div></nav>`}
+function render(){bump();let h='';
+if(V=='landing')h=landing();else if(V=='lang')h=langPick();else{h=nav()+'<div class="wrap">'+({home,dept:deptV,chat:chatV,appts:apptsV,profile:profileV,admin:adminV})[V]()+'</div>'}
+E.innerHTML=h;if(V=='chat'){const m=$('.msgs');m.scrollTop=m.scrollHeight}}
+function landing(){const r=reg.step;return`<div class="wrap hero"><div><span class="chip">Dental · General · Physiotherapy · Ayurveda</span><h1>MediGuide AI</h1><p style="font-size:1.2rem" class="mut">Your intelligent healthcare assistant — from symptoms to appointment.</p>
+<div class="card" style="max-width:440px">${!r?`<div class="row"><button onclick="reg={step:'login'};render()">Login</button><button class="g" onclick="reg={step:'mobile'};render()">Register</button><button class="g" onclick="demo()">Continue as Demo Patient</button></div><p class="sm mut">Registration is always free. We collect only the information required for your appointment.</p>`
+:r=='login'||r=='mobile'?`<h3>${r=='login'?'Login':'Register'}</h3><label class="sm">Mobile number</label><input id="mob" inputmode="numeric" maxlength="10" placeholder="10-digit number" value="${reg.mob||''}"><div class="row" style="margin-top:10px"><button onclick="sendOtp()">Send OTP</button><button class="g" onclick="reg={};render()">Back</button></div>`
+:r=='otp'?`<h3>Verify mobile</h3><p class="chip">Demo OTP: ${OTP} (no real SMS is sent)</p><input id="otp" inputmode="numeric" maxlength="4" placeholder="Enter 4-digit OTP"><div class="row" style="margin-top:10px"><button onclick="verOtp()">Verify</button><button class="g" onclick="reg={};render()">Cancel</button></div>`
+:`<h3>Your details</h3><input id="nm" placeholder="Full name" style="margin-bottom:8px"><input id="em" placeholder="Email (optional)" type="email">`+`<div class="row" style="margin-top:10px"><button onclick="finishReg()">Create free account</button></div>`}</div></div>
+<div class="mock"><div class="bub b">I have been having knee pain for two weeks. Saturday morning works.</div><div class="bub b">A physiotherapy consultation may be appropriate. Dr. Karan Shah has 10:30 AM free.</div><div class="card"><b>Dr. Karan Shah</b><div class="mut sm">Saturday · 10:30 AM · ₹700</div><div class="prog"><span class="d">Understand</span><span class="d">Slot</span><span>Verify</span><span>Details</span><span>Confirm</span></div></div></div></div>`}
+function demo(){seed();S.user={name:'Demo Patient',mob:'9876543210',verified:true,demo:true};save();go('lang')}
+function sendOtp(){const m=$('#mob').value.trim();if(!/^\d{10}$/.test(m))return toast('Enter a valid 10-digit mobile number');reg.mob=m;OTP=String(1000+Math.floor(Math.random()*9000));reg.step='otp';render()}
+function verOtp(){if($('#otp').value==OTP){if(reg.step&&S.appts.length==0&&false){}reg.step='det';render()}else toast('Incorrect OTP')}
+function finishReg(){const n=$('#nm').value.trim();if(!n)return toast('Please enter your name');S.user={name:n,mob:reg.mob,email:$('#em').value,verified:true};save();reg={};go('lang')}
+function langPick(){return`<div class="wrap" style="max-width:720px;padding-top:8vh"><h1>Choose your language</h1><p class="mut">You can change it anytime in the chat.</p><div class="grid g3">${LANGS.map(l=>`<button class="g" style="padding:1em;font-size:1.1rem" onclick="setLang('${l[0]}')">${l[1]}</button>`).join('')}</div></div>`}
+function setLang(c){S.lang=c;save();MSG=[];FLOW=null;go(V=='lang'?'home':V)}
+function home(){return`<h1>Welcome${S.user?', '+S.user.name.split(' ')[0]:''}</h1><p class="mut">Pick a care area, or just tell the assistant what you need.</p>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">${Object.entries(DP).map(([k,d])=>`<div class="dept" style="background:${d.bg}" onclick="go('dept','${k}')" tabindex="0" role="button"><div class="ic">${d.ic}</div><h2>${d.n}</h2><p>${d.d}</p><span class="chip">${D.filter(x=>x.dp==k).length} doctors</span></div>`).join('')}</div>
+<div class="card" style="margin-top:14px;background:var(--mint)"><div class="row"><div style="flex:1"><h3>Not sure where to start?</h3><span class="mut">Describe it in your own words — type or speak.</span></div><button onclick="go('chat')">Open AI Assistant</button></div></div>`}
+function rating(d){const r=(S.reviews||[]).filter(x=>x.doc==d.id);const b=4.3+(d.id*7%6)/10,n0=20+d.id*6;return{avg:((b*n0+r.reduce((a,x)=>a+x.stars,0))/(n0+r.length)).toFixed(1),n:n0+r.length}}
+const stars=n=>'★'.repeat(n)+'☆'.repeat(5-n);
+function showRev(id){const e=$('#rv'+id);if(e.innerHTML){e.innerHTML='';return}const mine=(S.reviews||[]).filter(x=>x.doc==id).map(x=>`<div class="sm"><b>${stars(x.stars)}</b> ${x.text||''} <span class="mut">— ${x.name}</span></div>`).join('');e.innerHTML='<div style="margin-top:8px">'+mine+'<div class="sm"><b>★★★★★</b> Listened carefully and explained everything clearly. <span class="mut">— Patient</span></div><div class="sm"><b>★★★★☆</b> Easy booking, short waiting time. <span class="mut">— Patient</span></div></div>'}
+function rvForm(id){const e=$('#rf'+id);e.innerHTML=`<div style="margin-top:8px"><label class="sm">Your rating</label><select id="rs${id}"><option value="5">★★★★★ Excellent</option><option value="4">★★★★☆ Good</option><option value="3">★★★☆☆ Okay</option><option value="2">★★☆☆☆ Poor</option><option value="1">★☆☆☆☆ Very poor</option></select><input id="rt${id}" maxlength="200" placeholder="Short comment (optional) — please don’t include medical details" style="margin:6px 0"><button class="s" onclick="saveRev(${id})">Submit review</button></div>`}
+function saveRev(id){const a=S.appts.find(z=>z.id==id);S.reviews=S.reviews||[];S.reviews.push({doc:a.doc,stars:+$('#rs'+id).value,text:$('#rt'+id).value.replace(/</g,'&lt;'),name:S.user.name.split(' ')[0],date:iso(new Date())});a.rev=true;save();toast('Thank you for your review!');render()}
+function rvLatest(){const a=S.appts.find(z=>z.st=='Completed'&&!z.rev);if(!a)return toast('No completed appointments waiting for a review');window.scrollTo(0,0);rvForm(a.id);const e=$('#rf'+a.id);if(e)e.scrollIntoView({behavior:'smooth',block:'center'})}
+function docCard(d){const sl=slots(d).filter(s=>s.st=='Available');const nx=sl[0];return`<div class="card"><h3>${d.n}</h3><div class="mut sm">${d.sp} · ${d.ex}</div><div class="sm"><b>${d.h}</b></div><div style="margin:8px 0"><span class="chip" style="font-weight:700;font-size:1rem;margin:0">Consultation fee: ₹${d.fee}</span></div><div class="sm"><b style="color:#E0A100">★ ${rating(d).avg}</b> (${rating(d).n} reviews) · <a href="#" onclick="showRev(${d.id});return false">Read reviews</a></div><div id="rv${d.id}"></div><p class="sm">${ONLINE?'Next available':'Demo availability'}: <b>${nx?fd(nx.date).split(',')[0]+' '+ft(nx.t):'—'}</b><br>Available Mon–Sun, 9 AM–6 PM</p><div class="row"><button class="s" onclick="bookDoc(${d.id})">Book Appointment</button><a href="tel:${d.ph}"><button class="g s">📞 ${d.ph}</button></a></div></div>`}
+function deptV(){const d=DP[DEPT];return`<h1>${d.ic} ${d.n}</h1><p class="mut">${d.d}</p><p>${(()=>{const f=D.filter(x=>x.dp==DEPT).map(x=>x.fee);return`<span class="chip">Consultation fees: ₹${Math.min(...f)} – ₹${Math.max(...f)}</span>`})()}</p><div>${d.sv.map(s=>`<button class="chip" style="border:0;cursor:pointer" onclick="ask('${s.replace(/'/g,'’')}')">${s}</button>`).join('')}</div>${HS?`<div class="row" style="margin-top:16px"><button class="s g" onclick="HS=null;render()">← All hospitals</button><h2 style="margin:0">${HS}</h2></div><div class="grid g2" style="margin-top:10px">${D.filter(x=>x.dp==DEPT&&x.h==HS).map(docCard).join('')}</div>`:`<h2 style="margin-top:16px">Choose a hospital</h2><div class="grid g2">${[...new Set(D.filter(x=>x.dp==DEPT).map(x=>x.h))].map(h=>`<div class="card"><h3>${h}</h3><div class="mut sm">${DP[DEPT].n} · ${D.filter(x=>x.h==h).length} doctors</div><button class="s" style="margin-top:10px" onclick="HS='${h}';render()">View doctors →</button></div>`).join('')}</div>`}<div class="warn"><b>Urgent?</b> <a href="tel:${D.find(x=>x.dp==DEPT).ph}"><button class="r s">CALL ${D.find(x=>x.dp==DEPT).n.toUpperCase()}</button></a></div>`}
+function bookDoc(id){const d=D[id];DEPT=d.dp;FLOW=null;MSG=[];go('chat');setTimeout(()=>user('Book '+d.n),50)}
+function ask(s){FLOW=null;MSG=[];go('chat');setTimeout(()=>user(s),50)}
+/* ---------- CHAT ---------- */
+const EMER=/chest pain|can.?t breathe|cannot breathe|breathless|unconscious|faint|stroke|seizure|severe bleeding|heavy bleeding|heart attack|poison|overdose|suicid|paralys|ಎದೆ ನೋವು|सीने में दर्द|सांस नहीं/i;
+function bot(h,raw){MSG.push({r:'b',h});if(voice&&raw&&speechSynthesis){const u=new SpeechSynthesisUtterance(raw);u.lang=L()[2];speechSynthesis.speak(u)}drawMsgs()}
+function drawMsgs(){const m=$('.msgs');if(!m)return;m.innerHTML=MSG.map(x=>`<div class="bub ${x.r}">${x.h}</div>`).join('');m.scrollTop=m.scrollHeight;const p=$('#prog');if(p)p.innerHTML=prog()}
+function prog(){const n=FLOW?FLOW.step:1;return['Understand','Slot','Verify','Details','Confirm'].map((x,i)=>`<span class="${i<n?'d':''}">${i+1} ${x}</span>`).join('')}
+function chatV(){if(!MSG.length)MSG.push({r:'b',h:`${L()[3]}<br><span class="mut sm">Try:</span><br>${["I have a fever and cough.","I need a dental cleaning.","My knee has been hurting.","I want to book Dr. Rao this Saturday.","I need a follow-up appointment."].map(s=>`<button class="chip" style="border:0;cursor:pointer" onclick="user('${s}')">${s}</button>`).join('')}`});
+return`<div class="card chat"><div class="row"><b>AI Assistant · ${DP[DEPT].n}</b><select style="width:auto;margin-left:auto" onchange="setLang(this.value)" aria-label="Language">${LANGS.map(l=>`<option value="${l[0]}" ${l[0]==S.lang?'selected':''}>${l[1]}</option>`).join('')}</select><button class="r s" onclick="emergency()">🚨 Emergency</button></div><div class="prog" id="prog">${prog()}</div>
+<div class="msgs" aria-live="polite">${MSG.map(x=>`<div class="bub ${x.r}">${x.h}</div>`).join('')}</div>
+<div class="sm mut" id="mst">Tap microphone and speak — or type below. <label><input type="checkbox" style="width:auto" onchange="voice=this.checked"> Read replies aloud</label></div>
+<div class="inp"><button class="mic" id="mic" onclick="mic()" aria-label="Start recording">🎤</button><input id="ci" placeholder="Type your request…" onkeydown="if(event.key=='Enter')sendBox()"><button onclick="sendBox()">Send</button></div></div>`}
+function sendBox(){const i=$('#ci');if(i.value.trim()){user(i.value.trim());i.value=''}}
+let rec;function mic(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition,b=$('#mic'),st=$('#mst');if(!SR)return toast('Speech recognition is not supported on this browser — please type instead');if(rec){rec.abort();return}
+rec=new SR();rec.lang=L()[2];rec.interimResults=true;b.classList.add('rec');b.setAttribute('aria-label','Stop recording');st.innerHTML='🔴 Listening… tap again to cancel';let fin='';
+rec.onresult=e=>{fin=[...e.results].map(r=>r[0].transcript).join('');$('#ci').value=fin};rec.onend=()=>{rec=null;b.classList.remove('rec');st.textContent='Tap microphone and speak';if(fin){voice=true;$('#ci').value='';user(fin)}};rec.onerror=()=>toast('Microphone unavailable or permission denied');rec.start()}
+function emergency(){const d=D.find(x=>x.dp==DEPT);MSG.push({r:'b',h:`<div class="warn"><b>This may require urgent medical attention.</b> Please seek emergency care immediately or contact your local emergency service.<div class="row" style="margin-top:8px"><a href="tel:${d.ph}"><button class="r">CALL DOCTOR · ${d.n}</button></a><a href="tel:112"><button class="r">CALL LOCAL EMERGENCY SERVICES (112)</button></a></div><div class="sm mut" style="margin-top:6px">Calls need a phone or device with network service.</div></div>`});drawMsgs()}
+function parse(x){x=x.toLowerCase();const o={};
+if(/tooth|teeth|dental|gum|braces|root canal|cavit|wisdom|implant|ಹಲ್ಲು|दांत/.test(x))o.dp='dental';else if(/knee|back pain|neck|shoulder|physio|fracture|sports|posture|rehab|joint|ಮೊಣಕಾಲು|घुटने/.test(x))o.dp='physio';else if(/ayurved|panchakarma|digest|stress|sleep|herbal/.test(x))o.dp='ayur';else if(/fever|cold|cough|headache|stomach|allergy|skin|pressure|sugar|diabet|thyroid|check.?up|physician|child|doctor|ಜ್ವರ|बुखार/.test(x))o.dp='general';
+const dc=D.filter(d=>x.includes(d.k)).sort((a,b)=>b.k.length-a.k.length)[0];if(dc){o.doc=dc.id;o.dp=dc.dp}
+if(/today/.test(x))o.day=iso(new Date());else if(/tomorrow|kal\b/.test(x))o.day=iso(addD(1));else{DAYS.forEach((dn,i)=>{if(x.includes(dn)||x.includes(dn.slice(0,3)+' ')){for(let k=0;k<7;k++)if(addD(k).getDay()==i&&!(k==0&&!/today/.test(x))){o.day=iso(addD(k));break}}})}
+const m=x.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/)||x.match(/\bat (\d{1,2})(?::(\d{2}))?()/)||x.match(/(\d{1,2}):(\d{2})()/);if(m){let h=+m[1];if(m[3]=='pm'&&h<12)h+=12;if(!m[3]&&h<8)h+=12;o.tm=pad(h)+':'+(m[2]||'00')}
+if(/morning/.test(x))o.part='am';else if(/afternoon/.test(x))o.part='pm';else if(/evening/.test(x))o.part='ev';
+o.any=/anyone|any doctor|first available/.test(x);o.urg=/urgent|asap|today/.test(x);return o}
+function match(s,o){if(o.day&&s.date!=o.day)return false;const h=+s.t.slice(0,2);if(o.part=='am'&&h>=12)return false;if(o.part=='pm'&&(h<12||h>=16))return false;if(o.part=='ev'&&h<16)return false;if(o.tm&&s.t!=o.tm)return false;return true}
+function slotBtns(list){return list.map(s=>{REG.push(s);const d=D[s.doc];return`<button class="slot s" onclick="pick(${REG.length-1})"><b>${d.n}</b><br><span class="sm">${d.h}</span><br>${fd(s.date).split(',')[0]} · ${ft(s.t)} · ₹${d.fee}</button>`}).join('')}
+function user(x){MSG.push({r:'u',h:x.replace(/</g,'&lt;')});drawMsgs();const sx=S.lang;
+if(EMER.test(x)){FLOW=null;return emergency()}
+if(FLOW&&FLOW.step==3&&FLOW.otp){if(x.trim()==OTP){FLOW.otp=false;FLOW.step=4;S.user.verified=true;save();return who()}return bot('That code doesn’t match. Please try again — the demo code is shown above.')}
+if(/cancel/i.test(x)&&/appointment|booking/i.test(x)){const a=up()[0];if(!a)return bot('You have no upcoming appointments to cancel.');return bot(`Cancel your appointment with <b>${D[a.doc].n}</b> on ${fd(a.date)} at ${ft(a.t)}?<br><button class="r s" onclick="cancelAp(${a.id})">Yes, cancel it</button> <button class="g s" onclick="bot('Okay, your appointment stays confirmed.')">Keep it</button>`)}
+const o=parse(x);const rs=/move|reschedul|shift|can.?t attend/i.test(x);if(rs){const a=up()[0];if(a){FLOW={step:2,resched:a.id}}}
+if(/usual|my doctor/i.test(x)&&S.prefs.doc!=null){o.doc=S.prefs.doc;o.dp=D[o.doc].dp}
+if(o.dp)DEPT=o.dp;const dp=o.dp||DEPT;if(!FLOW)FLOW={step:1};
+let docs=o.doc!=null?[D[o.doc]]:D.filter(d=>d.dp==dp);if(o.doc!=null&&!o.day&&!o.tm&&!o.part){}
+let all=[];docs.forEach(d=>all.push(...slots(d).filter(s=>s.st=='Available')));let hit=all.filter(s=>match(s,o));
+let pre=t('found');
+if(!hit.length){const relax=[];const wide=D.filter(d=>d.dp==dp);wide.forEach(d=>relax.push(...slots(d).filter(s=>s.st=='Available'&&(!o.day||s.date==o.day||Math.abs(s.k-(o.day?Math.round((new Date(o.day+'T12:00')-new Date())/864e5):0))<=1))));
+let alts=relax.filter(s=>match(s,{...o,tm:null,doc:null})).slice(0,4);if(!alts.length)alts=relax.slice(0,4);pre=t('alt');hit=alts}
+else if(o.doc==null&&hit.length>4){hit=hit.sort((a,b)=>a.k-b.k||a.t.localeCompare(b.t)).filter((s,i,arr)=>arr.findIndex(z=>z.doc==s.doc)==i).slice(0,4)}else hit=hit.slice(0,4);
+FLOW.step=2;FLOW.dept=dp;FLOW.o=o;
+const note=dp=='general'?'This may be appropriate for a general medical consultation.':dp=='dental'?'A dentist can evaluate this.':'A physiotherapy consultation may help; a healthcare professional should evaluate this.';
+if(!hit.length){return bot(`${note}<br>${t('none')}<br><button class="s" onclick="joinWait(${o.doc!=null?o.doc:docs[0].id})">Join Waitlist</button>`)}
+bot(`${note}<br>${pre}<br>${ONLINE?'':'<span class="sm mut">Demo Availability</span><br>'}${slotBtns(hit)}<br><span class="sm mut">Say “anyone is fine” and I’ll choose the best fit.</span>`,pre)}
+const up=()=>S.appts.filter(a=>a.st=='Confirmed'&&a.date>=iso(new Date())).sort((a,b)=>a.date.localeCompare(b.date));
+function pick(i){const s=REG[i];if(FLOW&&FLOW.resched){const a=S.appts.find(z=>z.id==FLOW.resched);a.date=s.date;a.t=s.t;a.doc=s.doc;save();FLOW=null;return bot(`<div class="ok">✓ Appointment rescheduled to <b>${D[s.doc].n}</b>, ${fd(s.date)} at ${ft(s.t)}.</div>`)}
+FLOW={...(FLOW||{}),step:3,slot:s};MSG.push({r:'u',h:`${D[s.doc].n} · ${fd(s.date).split(',')[0]} ${ft(s.t)}`});
+if(S.user&&S.user.verified){FLOW.step=4;return who()}
+OTP=String(1000+Math.floor(Math.random()*9000));FLOW.otp=true;bot(`We’ll verify your mobile number before confirming the appointment.<br><span class="chip">Demo OTP: ${OTP}</span> Type it below.`)}
+function who(){bot(`${t('who')}<br>${['Self','Parent','Child','Spouse','Other family member'].map(w=>`<button class="slot s" onclick="setWho('${w}')">${w}</button>`).join('')}<div class="sm mut">We collect only the information required for your appointment.</div>`,t('who'))}
+function setWho(w){FLOW.who=w;FLOW.step=4;const d=D[FLOW.slot.doc];MSG.push({r:'u',h:w});bot(`<div class="card"><b>${d.n}</b><div class="sm mut">${d.h} · ${DP[d.dp].n} · ${fd(FLOW.slot.date)} · ${ft(FLOW.slot.t)} · for ${w}</div><h3 style="margin-top:8px">Consultation Fee: ₹${d.fee}</h3><button onclick="payNow()">Pay ₹${d.fee} &amp; Confirm Appointment</button> <span class="chip">Demo Payment</span><div class="sm mut">No card details are stored. Registration is always free.</div></div>`)}
+function payNow(){if(!FLOW||!FLOW.slot)return;const s=FLOW.slot,d=D[s.doc];const a={id:Date.now(),doc:s.doc,date:s.date,t:s.t,st:'Confirmed',who:FLOW.who,type:'Consultation',paid:d.fee};S.appts.push(a);save();FLOW.step=5;bot('<b>✓ Payment Successful</b>');
+setTimeout(()=>{bot(`<div class="ok"><h3>✓ Appointment Confirmed</h3><b>Patient:</b> ${FLOW.who=='Self'?S.user.name:FLOW.who}<br><b>Doctor:</b> ${d.n}<br><b>Hospital:</b> ${d.h}<br><b>Department:</b> ${DP[d.dp].n}<br><b>Date:</b> ${fd(s.date)}<br><b>Time:</b> ${ft(s.t)}<br><b>Appointment Type:</b> Consultation<br><b>Amount Paid:</b> ₹${d.fee}<br><b>Status:</b> Confirmed<div class="row" style="margin-top:8px"><button class="s" onclick="ics(${a.id})">Add to Calendar</button><button class="s g" onclick="go('appts')">View Appointment</button><button class="s g" onclick="dl(${a.id})">Download Confirmation</button><a href="tel:${d.ph}"><button class="s g">Contact Clinic</button></a><button class="s g" onclick="toast('Demo: WhatsApp confirmation simulated')">WhatsApp</button><button class="s g" onclick="toast('Demo: SMS confirmation simulated')">SMS</button></div></div>`);FLOW=null},500)}
+function dl(id){const a=S.appts.find(z=>z.id==id),d=D[a.doc];const b=new Blob([`Appointment Confirmation\nPatient: ${S.user.name}\nDoctor: ${d.n}\nHospital: ${d.h}\nDepartment: ${DP[d.dp].n}\nDate: ${fd(a.date)}\nTime: ${ft(a.t)}\nAmount Paid: Rs ${a.paid}\nStatus: ${a.st}`],{type:'text/plain'});const l=document.createElement('a');l.href=URL.createObjectURL(b);l.download='appointment.txt';l.click();toast('Confirmation downloaded (works outside the preview)')}
+function ics(id){const a=S.appts.find(z=>z.id==id),d=D[a.doc],st=a.date.replace(/-/g,'')+'T'+a.t.replace(':','')+'00';const e=+a.t.slice(0,2)*60+ +a.t.slice(3)+30;const en=a.date.replace(/-/g,'')+'T'+pad(Math.floor(e/60))+pad(e%60)+'00';const c=`BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:${a.type} with ${d.n}\nDESCRIPTION:Patient ${S.user.name} · ${DP[d.dp].n}\nLOCATION:${d.h}\nDTSTART:${st}\nDTEND:${en}\nEND:VEVENT\nEND:VCALENDAR`;const l=document.createElement('a');l.href=URL.createObjectURL(new Blob([c],{type:'text/calendar'}));l.download='appointment.ics';l.click();toast('Calendar file created (opens in Google, Apple or Outlook calendar)')}
+function cancelAp(id){const a=S.appts.find(z=>z.id==id);a.st='Cancelled';S.cancelled++;save();bot('✓ Your appointment has been cancelled.');if(V=='appts')render()}
+function joinWait(id){S.wait.push(id);save();bot(`You’re on the waitlist for <b>${D[id].n}</b>. I’ll tell you when a slot opens.`);setTimeout(()=>{const bk=slots(D[id]).find(s=>s.st=='Booked'&&s.k>0);if(!bk)return;S.freed.push(bk.doc+'|'+bk.date+'|'+bk.t);bk.st='Available';S.wait=S.wait.filter(w=>w!=id);save();bot(`A slot with ${D[id].n} is now available at ${ft(bk.t)}. Would you like to book it?<br>${slotBtns([bk])}`)},4000)}
+/* ---------- OTHER VIEWS ---------- */
+function apRow(a,act){const d=D[a.doc];return`<div class="card"><div class="row"><div style="flex:1"><b>${d.n}</b><div class="sm mut">${d.h} · ${DP[d.dp].n} · ${fd(a.date)} · ${ft(a.t)} · for ${a.who}</div></div><span class="chip">${a.st}</span></div>${act?`<div class="row" style="margin-top:8px"><button class="s g" onclick="toast('${d.n}, ${ft(a.t)} — ${a.type}, ₹${a.paid} paid')">View</button><button class="s g" onclick="resch()">Reschedule</button><button class="s g" onclick="if(confirm('Cancel this appointment?'))cancelAp(${a.id})">Cancel</button><button class="s g" onclick="ics(${a.id})">Add to Calendar</button><a href="tel:${d.ph}"><button class="s g">Contact</button></a></div>`:''}${a.st=='Completed'?(a.rev?'<div class="sm mut" style="margin-top:6px">✓ Thanks for your review</div>':`<div class="row" style="margin-top:8px"><button class="s g" onclick="rvForm(${a.id})">Write a review</button></div><div id="rf${a.id}"></div>`):''}</div>`}
+function resch(){MSG=[];FLOW=null;go('chat');setTimeout(()=>user('Move my appointment to Monday evening'),50)}
+function apptsV(){const u=up(),h=S.appts.filter(a=>!u.includes(a)).sort((a,b)=>b.date.localeCompare(a.date));const n=u[0];
+return`<h1>Appointments</h1><h2>Upcoming</h2><div class="grid">${u.map(a=>apRow(a,1)).join('')||'<div class="card mut">No upcoming appointments. <a href="#" onclick="go(\'chat\');return false">Book one with the assistant</a>.</div>'}</div>
+${n?`<div class="card" style="margin-top:14px;background:var(--sky)"><h3>Preparing for your visit</h3><p>Your appointment is on ${fd(n.date)} at ${ft(n.t)}.</p><ul><li>Bring a photo ID and any previous reports or prescriptions.</li><li>Arrive 10 minutes early.</li></ul><span class="sm mut">Clinic-approved instructions only. Any fasting or medical instructions come from your doctor or clinic.</span></div>`:''}
+<h2 style="margin-top:16px">History</h2><div class="grid">${h.map(a=>apRow(a,0)).join('')}</div>
+<div class="card" style="margin-top:14px"><h3>How was your appointment?</h3><div class="row"><button class="s g" onclick="rvLatest()">Leave a review</button><button class="s g" onclick="ask('I need a follow-up appointment')">Need follow-up</button><button class="s g" onclick="ask('I need another appointment')">Need another appointment</button></div></div>`}
+function profileV(){const u=S.user||{},p=S.prefs;return`<h1>Profile</h1><div class="grid g2"><div class="card"><h3>${u.name||''}</h3><p>Verified mobile: <b>${u.mob||'—'}</b> ✓<br>Language: <b>${L()[1]}</b>${u.email?'<br>Email: '+u.email:''}</p><h3>Family profiles</h3><p class="sm">${S.fam.map(f=>f).join(', ')||'None yet'}</p><div class="row"><input id="fn" placeholder="Name (e.g. Mom)" style="flex:1"><button class="s" onclick="if($('#fn').value){S.fam.push($('#fn').value);save();render()}">Add</button></div></div>
+<div class="card"><h3>Saved preferences</h3><label class="sm">Preferred doctor</label><select onchange="S.prefs.doc=+this.value;save()"><option value="">None</option>${D.map(d=>`<option value="${d.id}" ${p.doc==d.id?'selected':''}>${d.n}</option>`).join('')}</select><label class="sm">Preferred time</label><select onchange="S.prefs.time=this.value;save()">${['Morning','Afternoon','Evening'].map(x=>`<option ${p.time==x?'selected':''}>${x}</option>`).join('')}</select><label class="sm">Preferred department</label><select onchange="S.prefs.dept=this.value;save()">${Object.entries(DP).map(([k,d])=>`<option value="${k}" ${p.dept==k?'selected':''}>${d.n}</option>`).join('')}</select></div></div>
+<div class="card" style="margin-top:14px"><h3>Privacy</h3><p class="sm">We collect only the information required for your appointment. Data stays in this browser in demo mode. Payment card details are never stored. Sessions end after 15 minutes of inactivity.</p><div class="row"><button class="g" onclick="go('langp')">Change language</button><button class="g" onclick="logout()">Log out</button><button class="r" onclick="if(confirm('Delete all your data?')){S=fresh();save();logout()}">Delete my data</button></div></div>`}
+Object.assign(window,{langp:0});const _go=go;go=function(v,d){if(v=='langp'){V='lang';return render()}_go(v,d)};
+function adminV(){const ap=S.appts,c=s=>ap.filter(a=>a.st==s).length,sv=[['General consultation',42],['Dental check-up',31],['Back / knee pain',27],['Follow-ups',19]];
+return`<h1>Clinic admin <span class="chip">demo</span></h1><div class="grid g3"><div class="card"><h2>${ap.length+14}</h2>Appointments today</div><div class="card"><h2>${c('Confirmed')+9}</h2>Confirmed · ${c('Cancelled')+S.cancelled} cancelled · ${S.wait.length+2} waitlisted</div><div class="card"><h2>₹${ap.reduce((s,a)=>s+(a.st!='Cancelled'?a.paid:0),0)+6400}</h2>Paid today (demo)</div></div>
+<h2 style="margin-top:16px">Doctor availability</h2><div class="card" style="overflow-x:auto"><table><tr><th>Doctor</th><th>Department</th><th>Open today</th><th>Open this week</th></tr>${D.map(d=>{const s=slots(d,0,1).filter(x=>x.st=='Available').length,w=slots(d).filter(x=>x.st=='Available').length;return`<tr><td>${d.n}<br><span class="sm mut">${d.h}</span></td><td>${DP[d.dp].n}</td><td>${s}</td><td>${w}</td></tr>`}).join('')}</table></div>
+<h2 style="margin-top:16px">Appointments</h2><div class="card" style="overflow-x:auto"><table><tr><th>Patient</th><th>Doctor</th><th>When</th><th>Status</th><th></th></tr>${ap.map(a=>`<tr><td>${S.user.name.split(' ')[0]} (${a.who})</td><td>${D[a.doc].n}</td><td>${fd(a.date).split(',')[0]} ${ft(a.t)}</td><td>${a.st}</td><td>${a.st=='Confirmed'?`<button class="s g" onclick="S.appts.find(z=>z.id==${a.id}).st='Completed';save();render()">Mark completed</button> <button class="s g" onclick="cancelAp(${a.id});render()">Cancel</button>`:''}</td></tr>`).join('')}</table><p class="sm mut">Only minimum patient information is shown.</p></div>
+<h2 style="margin-top:16px">AI analytics</h2><div class="card">${sv.map(x=>`<div class="sm">${x[0]} · ${x[1]}</div><div class="bar" style="width:${x[1]*2}%"></div>`).join('')}<p class="sm mut">Peak booking time: 9–11 AM · Appointment completion: 88% · Average doctor rating: ${(D.reduce((a,d)=>a+ +rating(d).avg,0)/D.length).toFixed(1)}/5 · New reviews: ${(S.reviews||[]).length}</p></div>`}
+render();
+if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+</script></body></html>
